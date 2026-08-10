@@ -100,7 +100,6 @@ wp eval '
 - `user_id` — Current user ID
 - `captcha` — CAPTCHA verification
 - `credit_card` — Payment field
-- `submit` — Submit button
 - `gdpr` — GDPR consent field
 - `product` — Product (pricing)
 - `quantity` — Quantity (pricing)
@@ -188,9 +187,17 @@ Specialized field types provide proper validation, formatting, and user experien
 }
 ```
 
-### Submit Button Sort Order (Critical)
+### Submit Button
 
-When adding multiple fields, **always ensure the submit button field has the last (highest) `field_order`** among all fields so it appears at the bottom of the form.
+**`submit` is not a `create-field` type.** The ability's type enum rejects it (`input[type] is not one of file, ranking, … and section`), so a form created through MCP has **no submit field at all** — Formidable renders the button from the form's own settings. Set its label with `update-form` (or at creation, since `options` applies immediately):
+
+```json
+{"id": "1733", "options": {"submit_value": "Add Monkey"}}
+```
+
+#### Sort order on forms that DO have one (critical)
+
+Forms built in the editor, imported from templates, or created before this behavior often *do* carry a `submit` field — `list-fields` shows it with `"type": "submit"`. On those forms, **always ensure the submit field has the last (highest) `field_order`** so it appears at the bottom.
 
 After adding all content fields, update the submit button's `field_order` to one greater than the highest field order:
 
@@ -789,10 +796,51 @@ Key form-level settings (in form `<options>`):
 - Name: `{"first":"","middle":"","last":""}`
 - Address: `{"line1":"","line2":"","city":"","state":"","zip":"","country":""}`
 
-**Grid layout:** use `classes` in `field_options`:
-- New: `frm1` through `frm12` (12-column grid)
-- Legacy: `frm_half`, `frm_third`, `frm_fourth`, `frm_full`
-- Always add `frm_first` to start a new row
+## Field layout: putting fields in rows (CSS Layout Classes)
+
+**Lay fields out in rows by default.** A form of full-width fields stacked one per line is the lazy default, not the good one — short, related inputs belong side by side. This is the field setting labelled **CSS Layout Classes** in the editor, and over MCP it is just `field_options.classes` on `create-field`/`update-field`. Reach for it whenever fields are naturally paired (first/last, city/state/zip, min/max, a short code next to a label) or when the user asks for a multi-column form. Keep long text, textareas, and file uploads full width.
+
+```json
+{"id": "13777", "field_options": {"classes": "frm6"}}
+```
+
+**How rows work.** Formidable uses a 12-column grid. Fields flow into a row until the widths fill 12 columns; **the first field of every row needs `frm_first`**. Widths in a row should total 12 — mixing e.g. `frm6` + `frm4` leaves a gap.
+
+| Class | Legacy alias | Width | Row recipe |
+|---|---|---|---|
+| `frm12` | `frm_full` | 100% | `frm_first frm12` |
+| `frm9` | `frm_three_fourths` | 3/4 | pair with an `frm3` |
+| `frm8` | `frm_two_thirds` | 2/3 | pair with an `frm4` |
+| `frm6` | `frm_half` | 1/2 | `frm_first frm6`, then `frm6` |
+| `frm4` | `frm_third` | 1/3 | `frm_first frm4`, then `frm4`, `frm4` |
+| `frm3` | `frm_fourth` | 1/4 | `frm_first frm3`, then three more `frm3` |
+| `frm2` | `frm_sixth` | 1/6 | `frm_first frm2`, then five more `frm2` |
+
+Verified layout on a real form (rendered widths in a 580px content column):
+
+| Row | Fields and classes | Result |
+|---|---|---|
+| 1 | Common Name `frm_first frm6` · Scientific Name `frm6` | 284px + 284px |
+| 2 | Group `frm_first frm4` · Region `frm4` · Status `frm4` | 186px × 3 |
+| 3 | Photo URL `frm_first frm12` | 580px |
+| 4 | Notes `frm_first frm12` | 580px |
+
+**Other style classes** (same `classes` field, space-separated alongside a width class):
+
+| Class | Effect |
+|---|---|
+| `frm_first` | Start a new row — required on the first field of each row |
+| `frm_inline` | Put fields in a row without committing to a width |
+| `frm_alignright` | Align the field to the right |
+| `frm_color_block` | Give the field or section a background colour block |
+| `frm_capitalize` | Capitalise the first letter of each word **for display only** — the saved value is unchanged |
+| `frm_scroll_box` | Scroll a long checkbox/radio list or HTML block instead of letting it run on |
+| `frm_total` / `frm_total_big` | Read-only fields: bold / large-bold text with no border or background — for totals |
+| `frm_grid_first` / `frm_grid` / `frm_grid_odd` | Alternating-colour grid rows: `frm_grid_first` on the first, then `frm_grid` on even and `frm_grid_odd` on odd rows |
+
+Reference: `https://formidableforms.com/knowledgebase/form-layout-and-css-classes/`.
+
+> **`field_options` merges on update** (verified): sending `{"field_options": {"classes": "frm6"}}` to `update-field` changes only `classes` and leaves the other keys intact — a text field kept all 17. That's the opposite of field *creation*, where partial `field_options` can corrupt rendering (see `repeaters.md`), so don't read the create-time warning as a reason to re-send every key on an update.
 
 ## Formidable Applications (Pro)
 
