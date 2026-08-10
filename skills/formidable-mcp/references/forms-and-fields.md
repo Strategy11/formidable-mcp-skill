@@ -100,7 +100,6 @@ wp eval '
 - `user_id` — Current user ID
 - `captcha` — CAPTCHA verification
 - `credit_card` — Payment field
-- `submit` — Submit button
 - `gdpr` — GDPR consent field
 - `product` — Product (pricing)
 - `quantity` — Quantity (pricing)
@@ -188,9 +187,17 @@ Specialized field types provide proper validation, formatting, and user experien
 }
 ```
 
-### Submit Button Sort Order (Critical)
+### Submit Button
 
-When adding multiple fields, **always ensure the submit button field has the last (highest) `field_order`** among all fields so it appears at the bottom of the form.
+**`submit` is not a `create-field` type.** The ability's type enum rejects it (`input[type] is not one of file, ranking, … and section`), so a form created through MCP has **no submit field at all** — Formidable renders the button from the form's own settings. Set its label with `update-form` (or at creation, since `options` applies immediately):
+
+```json
+{"id": "1733", "options": {"submit_value": "Add Monkey"}}
+```
+
+#### Sort order on forms that DO have one (critical)
+
+Forms built in the editor, imported from templates, or created before this behavior often *do* carry a `submit` field — `list-fields` shows it with `"type": "submit"`. On those forms, **always ensure the submit field has the last (highest) `field_order`** so it appears at the bottom.
 
 After adding all content fields, update the submit button's `field_order` to one greater than the highest field order:
 

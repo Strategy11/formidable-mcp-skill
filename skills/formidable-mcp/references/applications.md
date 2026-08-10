@@ -50,17 +50,19 @@ Every step uses Formidable MCP abilities. **No wp-cli or SQL writes anywhere in 
 
 ### Step 2: Add Fields to the Form
 
-`formidable-forms/create-field`, once per field. Remember: the submit button must have the highest `field_order`.
+`formidable-forms/create-field`, once per field. `submit` is not a creatable type — set the button label with `update-form` `options.submit_value`. If the form already has a `submit` field (older/editor-built forms), keep it at the highest `field_order`.
 
 ```json
 {"form_id": "1429", "type": "text", "name": "Game", "field_order": 1}
 ```
 
-Add more fields (name, score, etc.) with sequential `field_order` values. After all content fields are added, use `update-field` to move the submit button to the highest order.
+Add more fields (name, score, etc.) with sequential `field_order` values.
 
 View templates need field **keys** (not names) for shortcodes — get them with `formidable-forms/list-fields` for the form (e.g., `[game2]`, `[player2]`, `[score2]`).
 
 ### Step 3: Create the View (one call)
+
+> **Before writing view content, read `entries-and-views.md` § "Styling views" and § "Grid views".** Two rules decide the shape of this call and are easy to miss when arriving from this page: styling goes in the View Custom CSS setting (`options.listing_page_custom_css`), never inline `style=` attributes; and a card/column layout should be a **`type: "grid"`** view with `options.grid_column_count`, not a classic view wrapping a hand-built `display:grid` container.
 
 `formidable-forms/create-view` creates the `frm_display` post AND sets ALL required postmeta automatically (`frm_form_id`, `frm_form`, `frm_param`, `frm_type`, `frm_active_preview_filter`, `frm_dyncontent`, `frm_grid_view`, `frm_show_count`, `frm_options`). **Do not create views with `wp post create` or `wp_insert_post`.**
 

@@ -1,0 +1,5 @@
+# Keep repo plumbing out of `git archive` output and GitHub's source zips.
+# These files only mean anything inside a git checkout.
+.gitattributes export-ignore
+.gitignore export-ignore
+skills/formidable-mcp/scripts/.gitignore export-ignore
