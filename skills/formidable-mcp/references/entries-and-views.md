@@ -411,6 +411,28 @@ Full classic example (a styled high-scores table). **Prefer semantic class names
 }
 ```
 
+### Write view content as readable HTML
+
+**Format view content the way a person would write it — block-level tags on their own lines, indented by nesting depth.** View `content`, `before_content`, `after_content`, and grid box `content` all preserve newlines and tabs through save and `get-view`, so there is no reason to emit one unbroken line. A wall of jammed-together markup is the single clearest sign a machine wrote it, and it is what a site owner has to edit later in the Views editor.
+
+```html
+<div class="monkey-card__media"><img class="monkey-card__photo" src="[photo-url]" alt="[common-name]" /></div>
+<div class="monkey-card__body">
+	<h3 class="monkey-card__name">[common-name]</h3>
+	<ul class="monkey-card__facts">
+		<li><span>Group</span>[group]</li>
+		<li><span>Status</span><em class="monkey-status monkey-status--[conservation-status sanitize=1]">[conservation-status]</em></li>
+	</ul>
+</div>
+```
+
+Two constraints from `wpautop`, both verified by inspecting the rendered DOM:
+
+- **Keep an inline run on one line.** A newline *between inline elements* becomes a `<br>` — breaking `<li><span>Status</span>` and `<em>…</em>` across two lines injects a line break inside the `<li>`. Indentation *between block-level tags* is safe.
+- **Make every top-level child a block element.** A bare leading `<img>` followed by a newline and a `<div>` produced a stray empty `<p>`; wrapping the image in a `<div>` removed it.
+
+So: newlines and tabs for structure, inline content unbroken, no bare inline elements at the top level. Verified: the card above renders with **0** stray `<br>` and **0** empty `<p>`.
+
 ### Styling views: prefer the View Custom CSS setting over inline styles
 
 **Default to semantic class names in the HTML plus rules in the View Custom CSS setting — not inline `style=` attributes and not `<style>` tags inside the content.** Inline styles repeated on every `<td>`/`<div>` make the content unreadable and painful for a non-developer to update; a `<style>` block dumped into `content` is unscoped (it can restyle the whole page) and clutters the markup. The Custom CSS setting keeps the HTML clean and the styling in one editable place — the ability schema itself recommends this ("Prefer class attributes over inline style attributes, and put the rules in the `listing_page_custom_css` option").
@@ -428,6 +450,9 @@ Verified behavior (formidable-api + formidable-views):
 - **The API auto-scopes `listing_page_custom_css` and `detail_page_custom_css` to the view.** Write plain selectors (`.scores td { ... }`); on save each rule is nested under `.frm-view-content-<view_id>` (and a `.scores.frm-view-content-<view_id>` variant, for when the class sits on the view container itself). So your CSS **cannot leak to the rest of the page**, and you never write the scope selector yourself. Re-sending stored CSS is idempotent — the scope isn't doubled (`FrmAPIViewsController::scope_css_options()` unnests then re-nests).
 - **CSS options bypass kses** (`is_css_option()`), so child combinators (`>`), `url("img%20one.png")`, and entities survive intact — unlike ordinary HTML options, where kses would rewrite `>` to `&gt;`. Tags *are* stripped, so don't try to smuggle markup through a CSS option.
 - **`get-view` returns all three keys** inside `options` (`listing_page_custom_css`, `detail_page_custom_css`, `custom_css`) — verify the round trip straight from the API response. The stored value comes back already scoped.
+- **`options` merges on update.** Sending `options: {"grid_column_count": 2}` to `update-view` leaves `listing_page_custom_css`, `order_by`, and the rest untouched (verified) — you never need to re-send the whole options object to change one key.
+
+> **Gotcha — don't size view CSS in `rem`.** `rem` resolves against the *theme's* root font-size, and the 62.5%-root trick is common: on Twenty Twenty `html` is **10px** while body text is 18px, so `font-size: .78rem` renders at **7.8px**, not the ~12.5px intended. Every `rem` value silently comes out at 62.5% of what you meant, and it changes per theme. Use `px` for predictable sizing (or `em`, which inherits the real body size). Check with `getComputedStyle(document.documentElement).fontSize` before trusting `rem` in a view.
 - The rendered view is wrapped in `<div class="frm-view-content-<id>">…</div>`, and Views prints the CSS inline on the page (`FrmViewsInlineStyleController`). Handy for confirming in the browser which view a rule belongs to.
 
 Worked pattern (a card gallery — verified rendering end-to-end). **Note the `type: "grid"`**: for anything laid out as cards or columns, use a grid view and its built-in column setting rather than a classic view with a hand-rolled `display:grid` container — see "Grid views" below for why.
@@ -557,6 +582,38 @@ Each content box is added to the listing layout automatically, **one row per box
 Anything else yields no class at all (the box renders unstyled), so don't pass a raw column count above 4. Verified end-to-end: `layout: 3` → three `frm4`; `layout: 7` → `frm3`/`frm6`/`frm3` measuring 62/128/62px.
 
 `list-view-layouts` takes an optional `type` filter (`listing` or `detail` only). Detail pages need their own `type: "detail"` layout — see "Detail pages" below.
+
+#### Nested layouts
+
+**A box can contain its own rows.** Give a box a `rows` array instead of leaving it a leaf, and it becomes a nested 12-column grid inside its `.frm{n}` cell. The structure is recursive: `rows → boxes → rows → boxes …`
+
+```json
+[
+  {"id": 600, "layout": 5, "boxes": [
+    {"id": 700, "rows": [
+      {"id": 601, "layout": 1, "boxes": [{"id": 1}]},
+      {"id": 602, "layout": 1, "boxes": [{"id": 3}]}
+    ]},
+    {"id": 701, "rows": [
+      {"id": 603, "layout": 1, "boxes": [{"id": 5}]},
+      {"id": 604, "layout": 2, "boxes": [{"id": 7}, {"id": 9}]}
+    ]}
+  ]},
+  {"id": 606, "layout": 1, "boxes": [{"id": 11}]}
+]
+```
+
+That renders a 25/75 split where the narrow column stacks a thumbnail over a badge, the wide column stacks a header over a two-up stat row, and a full-width row sits underneath. Verified end-to-end.
+
+Practical rules, all learned the hard way:
+
+- **A box with `rows` holds no content of its own** — it is purely a container. Put content in the leaf boxes.
+- **Ids are yours to choose and are not validated against the content boxes.** Container boxes and rows can use ids that appear nowhere in `content` (they render as empty structure); a leaf id with no matching content box renders an empty cell. Pick a distinct range (e.g. rows `600+`, containers `700+`) so they never collide with the content ids.
+- **Nested rows do NOT get `frm_no_grid_750`** — only top-level rows do. A nested multi-column row stays side-by-side on mobile unless you write the media query yourself.
+- **Give sibling columns the same number of nested rows.** The Layout Builder lays the tree out as a visual grid, so a column with fewer rows than its sibling shows up as an empty hole in the UI. If one side needs less, promote the extra content to a full-width top-level row instead of padding the short column.
+- **Nesting multiplies the width division.** A `frm4` (⅓) containing a three-column row gives each nested cell **1/9** of the card. In a 580px content column at 3-up that's ~62px — unreadable. Budget the width down the tree before choosing a depth: *content column ÷ cards-per-row ÷ each nested division*.
+
+> **Gotcha — `create-view` renumbers box ids, `update-view` does not.** On create, whatever ids you send are rewritten to the editor scheme (content boxes on odd ids). On update the ids are stored **exactly as sent** — so re-sending `content` with boxes `1,2,3` after a create assigned `1,3,5` silently orphans every layout reference, and the view renders empty cells. Read the ids back with `get-view` and reuse them, or re-send the layout to match.
 
 > **Gotcha — a grid showing fewer cards than the form has entries is usually pagination, not a filter.** `options.page_size` (with `ajax_pagination`) caps how many entries render per page, and it is *separate* from `limit`. A view with `page_size: "3"` renders three cards and, with `ajax_pagination` on and only one page's worth of extra entries, may show **no visible pagination links at all** — so it just looks like entries are missing. Check `page_size` in `get-view` before suspecting `order_by`, filters, or the entries themselves; clear it with `options: {"page_size": ""}`. Count the rendered cards against `list-entries` as part of verifying any view.
 
