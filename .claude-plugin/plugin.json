@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "formidable-mcp",
+  "displayName": "Formidable Forms MCP",
+  "version": "1.0.0",
+  "description": "Create, query, and manage everything in Formidable Forms via MCP — forms, fields, repeaters, entries, views, styles, form actions, applications, PDFs, templates, and known MCP bugs",
+  "author": {
+    "name": "Strategy11",
+    "url": "https://formidableforms.com"
+  },
+  "homepage": "https://github.com/Strategy11/formidable-mcp-skill",
+  "repository": "https://github.com/Strategy11/formidable-mcp-skill",
+  "license": "MIT",
+  "keywords": ["formidable", "formidable-forms", "wordpress", "mcp", "forms"]
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "formidable",
+  "description": "Skills for working with Formidable Forms",
+  "owner": {
+    "name": "Strategy11",
+    "url": "https://formidableforms.com"
+  },
+  "plugins": [
+    {
+      "name": "formidable-mcp",
+      "source": "./",
+      "description": "Create, query, and manage everything in Formidable Forms via MCP — forms, fields, repeaters, entries, views, styles, form actions, applications, PDFs, templates, and known MCP bugs",
+      "category": "wordpress",
+      "tags": ["formidable", "wordpress", "forms", "mcp"]
+    }
+  ]
+}
