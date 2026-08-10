@@ -18,7 +18,7 @@ Form actions are stored as **WordPress posts** with specific requirements:
 
 ### Example: Email Action Record
 
-```sql
+```text
 ID: 10435
 post_type: 'frm_form_actions'
 post_parent: 1429          ← Linked to form 1429
@@ -209,18 +209,11 @@ Canonical create payload (verified end-to-end via MCP):
 
 **Token lifecycle (verified end-to-end):**
 
-- Tokens live in the dedicated **`wp_frm_gated_tokens`** table: `token_hash` (SHA-256), `action_id`, `entry_id`, `user_id` (NULL for guests), `ip_address`, `created_at`, `expired_at` (NULL = never). **The raw 32-char token is never stored in the DB** — only in the emailed/rendered URL. So read-only SQL can verify a token *exists* (count, entry_id, TTL) but can never recover the link; don't try.
+- Tokens live in the dedicated **`wp_frm_gated_tokens`** table: `token_hash` (SHA-256), `action_id`, `entry_id`, `user_id` (NULL for guests), `ip_address`, `created_at`, `expired_at` (NULL = never). **The raw 32-char token is never stored in the DB** — only in the emailed/rendered URL, so an access link can never be recovered after the fact; don't try.
 - Access URL: `{content-url}?access_code={raw_token}`. On a valid visit Formidable sets an **HttpOnly cookie `frm_gc_{type}_{id}`** (SameSite=Lax, expiry = token expiry or 1 year) and **redirects to strip `access_code` from the URL**; subsequent visits use the cookie. Links are reusable until expiry/revocation, but only in the browser that opened them (cookie-bound) unless the original link is used again.
 - Without a valid token: private content → 404; password-protected → the normal WP password form; with `access_page_id` set → redirect to that page instead.
 - **MCP `create-entry` and `update-entry` DO trigger the action** (verified: token rows appear with the correct TTL). Over the wp-cli stdio bridge the token's `user_id` is the `--user` admin, and the raw token lands in a transient scoped to that user — so an MCP-created entry's access link is not retrievable afterward. To capture a real access link end-to-end, submit through the frontend (Playwright) and read it from the confirmation message.
 - Deleting the action deletes all its token rows (verified); deleting/updating items also clears the action-item membership transients (`frm_gc_ac_*`).
-
-Verify via read-only SQL (never the raw token — it isn't there anyway):
-
-```sql
-SELECT id, entry_id, user_id, FROM_UNIXTIME(created_at), (expired_at - created_at) AS ttl
-FROM wp_frm_gated_tokens WHERE action_id = 10916;
-```
 
 For the `[frm_gated_content]` shortcode (rendering the links in confirmation/email content, `show=` values, the ~5-minute rendering window) see `shortcodes.md` §5. Developer hooks: `frm_gated_content_item_types`, `frm_gated_content_sanitize_item`, `frm_gated_content_token_data`, `frm_obtain_gated_token`, `frm_gated_content_shortcode_custom_output`, `frm_gated_content_shortcodes`.
 
@@ -365,7 +358,7 @@ Set the outcome's display name with the **top-level `post_title`** parameter. A 
 ```
 
 - Key settings (full list in `FrmAutoresponder::get_default_autoresponder()`): `do_default_trigger` `"yes"`/`"no"` — whether the action ALSO fires immediately; `send_date` — reference date: `"create"`, `"update"`, or a date-field ID; `send_before_after` + `send_unit` (`minutes`/`hours`/`days`/`months`/`years`) + `send_interval` (int); optional repeats via `send_after`/`send_after_limit`/`send_after_count`/`send_after_unit`/`send_after_interval`.
-- **How to verify scheduling without waiting:** entry creation (MCP `create-entry` included) queues a single WP-cron event, hook `formidable_send_autoresponder`, args `[entry_id, action_id]`, timestamp = reference date ± interval (verified: +10 minutes landed at +601s). Read the `cron` option (read-only SQL) or `wp cron event list`. `wp cron event run formidable_send_autoresponder` fires it early; the event is consumed from the queue after running.
+- **How to verify scheduling without waiting:** entry creation (MCP `create-entry` included) queues a single WP-cron event, hook `formidable_send_autoresponder`, args `[entry_id, action_id]`, timestamp = reference date ± interval (verified: +10 minutes landed at +601s). Inspect the queue with `wp cron event list`. `wp cron event run formidable_send_autoresponder` fires it early; the event is consumed from the queue after running.
 - Deleting an entry unschedules its pending events (`frm_before_destroy_entry` hook).
 
 Payment actions (`stripe`, `square`, `paypal`, `payment`) need live gateway credentials to exercise; don't submit test payments against a connected merchant account.

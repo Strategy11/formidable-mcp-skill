@@ -1,6 +1,6 @@
 # Formidable MCP Adapter: Protocol, Setup & Abilities
 
-Read this when: you need to connect to, configure, or call the Formidable Forms MCP adapter — protocol/session details, the wp-cli stdio bridge, the full abilities catalog, error solutions, or the access policy governing MCP vs REST vs SQL.
+Read this when: you need to connect to, configure, or call the Formidable Forms MCP adapter — protocol/session details, the wp-cli stdio bridge, the full abilities catalog, error solutions, or the access policy governing MCP vs REST.
 
 ## Access policy (mandatory)
 
@@ -13,7 +13,7 @@ Read this when: you need to connect to, configure, or call the Formidable Forms 
   ]
   ```
   With those rules in place, any attempt to curl other `/wp-json/` routes is blocked by the permission system.
-- **Direct SQL is acceptable for read-only verification queries only** (e.g., inspecting the raw `post_content` of a View or serialized style properties at the DB level). Never use SQL inserts/updates as a workaround when MCP fails — investigate the MCP error instead.
+- **Never write to the database directly.** MCP abilities handle validation, serialization, and cache clearing; raw writes bypass all three. When an MCP call fails, investigate the error rather than working around it.
 - If an MCP tool isn't exposing its abilities, **diagnose the MCP configuration** rather than routing around it (don't install packages manually, don't switch to REST, don't script direct DB writes). Workarounds mask the real problem and don't persist to future sessions.
 - For verifying WordPress admin state programmatically, prefer MCP abilities (`list-forms`, `get-form`, etc.) over browser-based admin-page authentication — MCP bypasses the login redirect entirely.
 - If MCP endpoints are unavailable or undocumented for a task, ask the user rather than switching to REST.

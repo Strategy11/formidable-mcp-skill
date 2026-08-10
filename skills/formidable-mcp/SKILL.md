@@ -30,7 +30,7 @@ Read the reference file(s) for the task at hand BEFORE making MCP calls. Do not 
 
 ## Universal rules (apply to every task)
 
-1. **MCP exclusively.** All creates/updates/deletes go through Formidable MCP abilities. Never fall back to the REST API. Direct SQL is for read-only verification of raw storage only.
+1. **MCP exclusively.** All creates/updates/deletes go through Formidable MCP abilities. Never fall back to the REST API, and never write to the database directly.
 2. **Every field gets a label** (accessibility requirement — no label-less fields).
 3. **Use specialized field types** — `name`, `email`, `phone`, `url` — not generic `text`, whenever the data has a specialized type.
 4. **Option fields have minimums:** radio buttons ≥ 2 options, dropdowns ≥ 2, checkboxes ≥ 1. Always provide options at creation.

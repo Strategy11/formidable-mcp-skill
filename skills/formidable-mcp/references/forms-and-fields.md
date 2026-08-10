@@ -171,7 +171,7 @@ Specialized field types provide proper validation, formatting, and user experien
 (`name` MUST be set — it displays as the label; `field_key` is generated as the internal reference and is different from `name`.)
 
 **Verification:**
-1. Call `list-fields` for the form (response `data` is an object keyed by field_key) — ensure no NULL/empty `name` values. OPTIONAL read-only deep-debugging alternative: `SELECT id, name FROM wp_frm_fields WHERE form_id = X`
+1. Call `list-fields` for the form (response `data` is an object keyed by field_key) — ensure no NULL/empty `name` values
 2. Verify in wp-admin form editor that labels appear
 
 ## Adding Fields to a Form
@@ -459,7 +459,7 @@ AI fields generate content using OpenAI/GPT based on input from other fields. Th
 }
 ```
 
-2. **Read a reference AI field's full field_options** via MCP (`list-fields` on a form with an existing AI field — response `data` is an object keyed by field_key). OPTIONAL read-only deep-debugging alternative: `SELECT field_options FROM wp_frm_fields WHERE type="ai" LIMIT 1`.
+2. **Read a reference AI field's full field_options** via MCP (`list-fields` on a form with an existing AI field — response `data` is an object keyed by field_key).
 
 3. **Merge in the AI settings and save with `update-field`** (`field_options` persists correctly; serialization and cache clearing are automatic):
 
@@ -864,4 +864,4 @@ For context on how applications are stored (useful when read-debugging):
 - Views are stored as posts with `post_type: "frm_display"` (NOT `frm_views`); the application retrieves views by querying `frm_display`
 - **No caching issues:** unlike forms, applications need no cache clearing after creation — the React admin UI fetches data via AJAX (`frm_get_data_for_application` action)
 
-All writes to this structure go through the application abilities above; OPTIONAL read-only SQL against these tables is acceptable for deep debugging only (prefer MCP `list-application-items` for verification).
+All writes to this structure go through the application abilities above; verify with MCP `list-application-items`.

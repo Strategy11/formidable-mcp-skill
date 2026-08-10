@@ -32,7 +32,7 @@ Applications = wp_terms (taxonomy: frm_application)
 
 **Critical Point:** Views MUST have `post_type: "frm_display"` (NOT "frm_views"). The retrieval code specifically queries for `frm_display` posts.
 
-**You never need to write to this storage directly.** The Formidable MCP abilities fully cover application management: `list-applications`, `get-application`, `create-application`, `add-item-to-application`, `remove-item-from-application`, `list-application-items`, `delete-application`. Notably, `add-item-to-application` handles the storage difference internally — forms go to `_frm_form_id` termmeta, views/pages go to `term_relationships` — so callers do not need to know that distinction to link items. Keep this storage model in mind only as background for reading the DB when deep-debugging (read-only SQL, optional).
+**You never need to write to this storage directly.** The Formidable MCP abilities fully cover application management: `list-applications`, `get-application`, `create-application`, `add-item-to-application`, `remove-item-from-application`, `list-application-items`, `delete-application`. Notably, `add-item-to-application` handles the storage difference internally — forms go to `_frm_form_id` termmeta, views/pages go to `term_relationships` — so callers do not need to know that distinction to link items. Keep this storage model in mind only as background for interpreting what the abilities return.
 
 ## Complete Workflow: Creating an Application
 
@@ -123,7 +123,7 @@ Related abilities: `formidable-forms/remove-item-from-application` (same params)
 {"application_id": 48}
 ```
 
-Returns `{application_id, application_name, items: [{id, name, type}]}` — confirm the form and view both appear. Use this for verification instead of SQL.
+Returns `{application_id, application_name, items: [{id, name, type}]}` — confirm the form and view both appear.
 
 ### Optional: Add Sample Entries
 
@@ -137,7 +137,7 @@ Returns `{application_id, application_name, items: [{id, name, type}]}` — conf
 
 After creating an application, verify it displays correctly:
 
-1. **MCP (primary)**: Call `formidable-forms/list-application-items` with the `application_id` and confirm every expected item appears in `items` with the right `type`. Prefer this over any SQL query.
+1. **MCP (primary)**: Call `formidable-forms/list-application-items` with the `application_id` and confirm every expected item appears in `items` with the right `type`.
 
 2. **Applications Page**: `/wp-admin/admin.php?page=formidable-applications`
    - Should show application card with form/view counts
@@ -145,7 +145,7 @@ After creating an application, verify it displays correctly:
 
 3. **Use a browser (e.g., Playwright) to verify**: Open the applications page and verify the application appears with correct counts and content displays.
 
-4. **OPTIONAL, read-only deep-debugging only**: If the MCP result and the admin UI disagree, inspect the raw storage with read-only SQL (`wp_terms`/`wp_termmeta` for the application and its `_frm_form_id` entries, `wp_term_relationships` for views/pages). Never fix discrepancies with SQL writes — use the MCP abilities.
+4. If the MCP result and the admin UI disagree, re-run `list-application-items` after a hard refresh before assuming the data is wrong — and fix any real discrepancy with the MCP abilities, never with direct writes.
 
 ## Common Mistakes & Solutions
 
@@ -376,11 +376,6 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 
 Get field keys with the `formidable-forms/list-fields` ability (pass the form ID) — each field's `field_key` is what goes in the shortcode.
 
-OPTIONAL (read-only deep-debugging only) — inspect the raw table if MCP output looks wrong:
-```sql
-SELECT id, name, field_key FROM wp_frm_fields WHERE form_id = 1517 ORDER BY field_order;
-```
-
 **Example:** If your form has fields:
 - "Story Category" → field_key: `lwrli` → use `[lwrli]` in view
 - "Character Name" → field_key: `v8lk9` → use `[v8lk9]` in view
@@ -428,24 +423,13 @@ When creating or editing a view in Formidable:
 - View templates reference new field keys, but entries have data in old field IDs
 - Shortcodes fail to resolve because the referenced fields have no data
 
-**Solution:** Migrate all entry data from old field IDs to new field IDs (deep-debugging repair for already-corrupted data; when feasible, prefer recreating the entries via the MCP `create-entry` ability instead):
-```php
-// Get all entries
-$entries = $wpdb->get_results("SELECT id FROM wp_frm_items WHERE form_id = 1518");
+**Solution:** Don't repair the orphaned rows in place — recreate the entries through MCP so validation, serialization, and cache clearing all run:
 
-foreach ($entries as $entry) {
-  // Copy data from old field ID to new field ID
-  $old_value = $wpdb->get_var("SELECT meta_value FROM wp_frm_item_metas WHERE item_id = {$entry->id} AND field_id = OLD_ID");
-  
-  if ($old_value) {
-    $wpdb->insert($wpdb->prefix . "frm_item_metas", [
-      "item_id" => $entry->id,
-      "field_id" => NEW_ID,
-      "meta_value" => $old_value
-    ]);
-  }
-}
-```
+1. `list-entries` on the form and read the surviving values out of each entry's response.
+2. `create-entry` for each one, keying the values by the **new** field IDs.
+3. `delete-entry` on the stale originals once the replacements verify.
+
+**Better still, prevent it:** don't delete and recreate fields on a form that already has entries. Rename or reconfigure the existing field with `update-field` instead — the field ID stays stable and the entry data keeps resolving.
 
 ### View Shortcodes Not Processing
 
@@ -457,8 +441,8 @@ foreach ($entries as $entry) {
 - Shortcode is in wrong format or references wrong field ID/key
 
 **Solution:**
-1. Verify field exists (query `wp_frm_fields` for the form)
-2. Verify entry has data (optional read-only SQL): `wp db query "SELECT * FROM wp_frm_item_metas WHERE item_id = ENTRY_ID"`
+1. Verify the field exists — `list-fields` on the form
+2. Verify the entry has data for it — `get-entry` on the entry ID
 3. Use field KEYS (not names) in shortcodes: `[field_key]` not `[field_name]`
 4. For conditional filtering, use: `[if field_key equals="value"]CONTENT[/if field_key]`
 
@@ -554,7 +538,7 @@ if (gameParam) {
 
 ## Important Notes
 
-- **Always use MCP**: All form/field/entry/view/application operations via MCP abilities — no wp-cli or SQL writes; wp-cli/SQL reads are optional deep-debugging only
+- **Always use MCP**: All form/field/entry/view/application operations via MCP abilities — never wp-cli or direct database writes
 - **Applications**: `create-application` → `add-item-to-application` (form, then view) → verify with `list-application-items`
 - **Views**: One `create-view` call creates the post and all required postmeta; never `wp post create`
 - **Post type critical**: Views MUST be `post_type: frm_display`, not `frm_views` (`create-view` guarantees this)

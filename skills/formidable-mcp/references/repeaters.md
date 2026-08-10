@@ -65,7 +65,7 @@ Choose before building: "Is this a simple flat group of fields, or a complex/reu
 
 ## Step-by-Step: Pattern 1 — Nested Forms Repeater
 
-Use MCP abilities for all creates/updates. SQL is OPTIONAL read-only deep-debugging only — prefer MCP reads (e.g. `get-form`) for verification.
+Use MCP abilities for all creates/updates, and MCP reads (e.g. `get-form`) for verification.
 
 ```bash
 # 1. Create the child form WITH the parent link in ONE call
@@ -347,28 +347,9 @@ Since field keys are now derived from field names, the readable form is what you
 - `formidable-forms/get-form` on the child form — returns `parent_form_id`; confirm it equals the parent form ID
 - `formidable-forms/list-fields` on parent and child forms — check types, ordering, and `field_options` (`repeat`, `form_select`, `in_section`). Note: the response `data` is an OBJECT keyed by field_key, not an array.
 
-### OPTIONAL: read-only SQL deep-debugging queries
+### OPTIONAL: WP-CLI deep debugging
 
-Use these ONLY for deep debugging when MCP reads aren't enough. Reads only — use MCP for all writes.
-
-```sql
--- Confirm parent/child relationship
-SELECT id, name, parent_form_id FROM wp_frm_forms WHERE id IN (<parent_id>, <child_id>);
-
--- Inspect field structure and ordering for the parent form
-SELECT id, field_order, type, name FROM wp_frm_fields
-WHERE form_id = <parent_id> ORDER BY field_order;
-
--- Inspect the divider's serialized options (look for repeat and form_select)
-SELECT id, field_options FROM wp_frm_fields WHERE id = <divider_id>;
-
--- Inspect repeater fields' options (look for in_section: <divider_id>;
--- value should be PHP-serialized, e.g. a:18:{...}, NOT JSON)
-SELECT id, name, field_options FROM wp_frm_fields
-WHERE form_id IN (<parent_id>, <child_id>) ORDER BY form_id, field_order;
-```
-
-Or (also OPTIONAL, read-only, deep-debugging only) via WP-CLI without raw SQL:
+Use this ONLY when MCP reads aren't enough — reads only, and MCP for every write:
 
 ```bash
 wp eval '

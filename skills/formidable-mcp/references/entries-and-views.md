@@ -202,7 +202,7 @@ Parameters:
 | `detail_content` | Detail Page content, rendered when an entry is opened via `[detaillink]`. Raw HTML for classic views; JSON box array for layout views — see "Detail pages" below |
 | `status` | `publish`, `private`, or `draft` (default `private`, matching the product). Draft only affects the standalone permalink (404 for visitors); draft and private views still render wherever they are embedded |
 
-View responses (create/update/get/list) include `slug` and `url` — `url` is the direct front-end permalink (`https://site/frm_display/<slug>/`), so no SQL lookup is needed to preview a view in a browser. Calendar view responses also include `date_field_id` (read from the view's options).
+View responses (create/update/get/list) include `slug` and `url` — `url` is the direct front-end permalink (`https://site/frm_display/<slug>/`), ready to open in a browser to preview the view. Calendar view responses also include `date_field_id` (read from the view's options).
 
 **Grid views auto-create a default 1-column listing layout.** To use more boxes/columns, call `create-view-layout` afterwards — it upserts (replaces the auto-created layout of the same type rather than adding a duplicate). `list-view-layouts` takes an optional `type` filter (`listing` or `detail` only — other values are rejected); a filter with no matching layout returns an empty array.
 
@@ -234,7 +234,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
   }' -k 2>&1 | jq '.result.structuredContent.data | {id, name, form_id, content, limit}'
 ```
 
-The create/update responses (and `get-view`) include `content` and `limit` — verify with `get-view`, not SQL.
+The create/update responses (and `get-view`) include `content` and `limit` — verify with `get-view`.
 
 ### View Postmeta: Set Automatically by `create-view`
 
@@ -280,7 +280,7 @@ Parameters:
 
 **`before_content`/`after_content` are accepted both as top-level parameters and nested inside `options`**, and either spelling now updates the `frm_before_content` / `frm_after_content` postmeta that the front end actually renders from (`FrmViewsDisplaysController` reads `$view->frm_before_content`; the `frm_options` copy alone is inert). When both are sent, the top-level value wins. An `options` update that doesn't mention them leaves them untouched. Nesting them in `options` used to be a silent no-op that looked like a caching bug; fixed in `FrmAPIViewsController::apply_view_options()`, covered by `test_before_after_content_nested_in_options_updates_postmeta` and `test_top_level_before_content_takes_precedence_over_options`.
 
-**`get-view` returns the persisted filters and before/after content.** View responses (get/create/update/list) include `before_content`, `after_content`, and `options` — the stored `frm_options` with the `where`/`where_is`/`where_val` filter arrays, `empty_msg`, ordering, etc. — alongside the earlier keys (`content`, `created_at`, `date_field_id`, `detail_content`, `form_id`, `id`, `limit`, `slug`, `status`, `title`, `updated_at`, `url`, `view_type`). A view with no stored options returns `options` as an empty object. Verify filters straight from the API response; fixed in `FrmAPIViewsController::prepare_item_for_response()`, covered by `test_get_view_returns_options_and_before_after_content` and `test_get_view_without_options_returns_object`. On older formidable-api builds `get-view` returned none of these three keys — there, fall back to read-only SQL on the postmeta (`frm_options`, `frm_before_content`, `frm_after_content`) or the view editor.
+**`get-view` returns the persisted filters and before/after content.** View responses (get/create/update/list) include `before_content`, `after_content`, and `options` — the stored `frm_options` with the `where`/`where_is`/`where_val` filter arrays, `empty_msg`, ordering, etc. — alongside the earlier keys (`content`, `created_at`, `date_field_id`, `detail_content`, `form_id`, `id`, `limit`, `slug`, `status`, `title`, `updated_at`, `url`, `view_type`). A view with no stored options returns `options` as an empty object. Verify filters straight from the API response; fixed in `FrmAPIViewsController::prepare_item_for_response()`, covered by `test_get_view_returns_options_and_before_after_content` and `test_get_view_without_options_returns_object`. On older formidable-api builds `get-view` returned none of these three keys — there, verify in the view editor instead.
 
 Filters are set through `options`: `where` (array of field IDs), `where_is` (array of operators), `where_val` (array of values, which may contain shortcodes such as `[get param=name]`). These parallel arrays are positional — index 0 of each belongs to the same rule. Example child-view filter for nested views:
 
@@ -427,7 +427,7 @@ Verified behavior (formidable-api + formidable-views):
 
 - **The API auto-scopes `listing_page_custom_css` and `detail_page_custom_css` to the view.** Write plain selectors (`.scores td { ... }`); on save each rule is nested under `.frm-view-content-<view_id>` (and a `.scores.frm-view-content-<view_id>` variant, for when the class sits on the view container itself). So your CSS **cannot leak to the rest of the page**, and you never write the scope selector yourself. Re-sending stored CSS is idempotent — the scope isn't doubled (`FrmAPIViewsController::scope_css_options()` unnests then re-nests).
 - **CSS options bypass kses** (`is_css_option()`), so child combinators (`>`), `url("img%20one.png")`, and entities survive intact — unlike ordinary HTML options, where kses would rewrite `>` to `&gt;`. Tags *are* stripped, so don't try to smuggle markup through a CSS option.
-- **`get-view` returns all three keys** inside `options` (`listing_page_custom_css`, `detail_page_custom_css`, `custom_css`) — verify the round trip from the API response, no SQL needed. The stored value comes back already scoped.
+- **`get-view` returns all three keys** inside `options` (`listing_page_custom_css`, `detail_page_custom_css`, `custom_css`) — verify the round trip straight from the API response. The stored value comes back already scoped.
 - The rendered view is wrapped in `<div class="frm-view-content-<id>">…</div>`, and Views prints the CSS inline on the page (`FrmViewsInlineStyleController`). Handy for confirming in the browser which view a rule belongs to.
 
 Worked pattern (a card grid built with readable HTML and zero inline styles — verified rendering end-to-end):
