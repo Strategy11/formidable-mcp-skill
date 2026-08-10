@@ -7,6 +7,7 @@ Conventions used throughout:
 - **This preference stops at shortcodes.** Stored settings that hold a field reference — `hide_field` conditional logic, `calc`, `form_select`, `in_section`, view `order_by`/`where`/`date_field_id`, quiz `enable` — require the numeric field ID and silently ignore a key. See repeaters.md § "Keys in CONTENT, Numeric IDs in SETTINGS". Entry payloads are the forgiving case — they take either form at every level.
 - **In View content, always reference fields by field KEY (e.g. `[lwrli]`), never by field name** (see entries-and-views.md). Field IDs also work. Field names produce blank output.
 - In email/confirmation actions, field IDs and keys are interchangeable; the built-in customization panel inserts IDs.
+- **Prefer dashes over underscores in shortcode tags** where both work — `[created-at]`, not `[created_at]`. Exactly seven tags support it, attributes never do, and conditional closing tags reject it; see § "Dashes vs underscores" in section 2 before applying this anywhere.
 - Everything here traces to the official Formidable knowledgebase. Items marked *(unconfirmed)* were not verifiable in the KB — do not treat as fact.
 - See actions.md for creating email/confirmation actions via MCP (this file covers the shortcode *content* that goes inside them).
 
@@ -25,7 +26,7 @@ Contexts: **Page** = page/post/widget · **View** = View content · **HTML** = f
 | `[x]` field value | Saved value of field x | – | ✓ | – | ✓ | ✓ | – | No |
 | `[x show=... sep=... format=...]` | Field formatting options | – | ✓ | – | ✓ | ✓ | – | Some (clickable, truncate) |
 | `[id]` / `[key]` | Entry ID / entry key (⚠ field ID/key inside form HTML) | – | ✓ | ✓ (field meaning) | ✓ | ✓ | – | No |
-| `[ip]`, `[created_at]`/`[created-at]`, `[updated_at]`, `[updated-by]`, `[post_id]`, `[form_name]` | Entry metadata | – | ✓ | – | ✓ | ✓ | `[ip]` only | No |
+| `[ip]`, `[created-at]`, `[updated-at]`, `[updated-by]`, `[post-id]`, `[form_name]` | Entry metadata | – | ✓ | – | ✓ | ✓ | `[ip]` only | No |
 | `[browser]`, `[referrer]` | Submitter user agent / referring URL | – | – | – | ✓ | – | – | No |
 | `[siteurl]`, `[sitename]` | Site URL / site title | – | ✓ | – | ✓ | ✓ | – | No |
 | `[admin_email]`, `[default-email]`, `[default-from-email]` | Admin/global-settings emails | – | – | – | ✓ (incl. recipients) | – | – | No |
@@ -71,7 +72,7 @@ Contexts: Views, email notifications, success/confirmation messages, post/page c
 | Option | Syntax | Notes |
 |---|---|---|
 | Separator | `[x sep=", "]` | Custom delimiter for checkbox/multi-value fields. Default comma. `sep` is a *parameter*, not a standalone `[sep]` shortcode. List example: `<ol><li>[x sep="</li><li>"]</li></ol>` |
-| Date format | `[x format="d-m-Y"]` | PHP `date()` characters. Works with date fields, `created_at`, `updated_at`. `[x format="D, F j, Y"]` → "Mon, September 21, 2016"; `l, M d, y` → "Monday, Sep 21, 16" |
+| Date format | `[x format="d-m-Y"]` | PHP `date()` characters. Works with date fields, `[created-at]`, `[updated-at]`. `[x format="D, F j, Y"]` → "Mon, September 21, 2016"; `l, M d, y` → "Monday, Sep 21, 16" |
 | Field label | `[x show="field_label"]` | The field's label instead of the value |
 | Field description | `[x show="description"]` | Field description / HTML content |
 | Saved value | `[x show="value"]` | Saved value instead of displayed label — essential for fields using **separate values** |
@@ -82,7 +83,7 @@ Contexts: Views, email notifications, success/confirmation messages, post/page c
 | Remove accents | `[x remove_accents=1]` | Strip accent marks. Combine: `[x remove_accents=1 sanitize=1]` |
 | Sanitize URL | `[x sanitize_url=1]` | URL-safe encoding. **Auto-applied to field shortcodes inside redirect URLs**; disable with `[x sanitize_url=0]`; preserve ampersands with `[x sanitize_url=0 keepjs=1]`. Example: `your-site.com/?pass_field=[x sanitize_url=1]` |
 | Truncate | `[x truncate=40]` | Limit to N characters. **Premium.** Custom link text: `[x truncate=100 more_text="Read More"]`; remove the "more" link: `[x truncate=100 no_link=1]` |
-| Time ago | `[x time_ago=3]` | Elapsed time from a saved date. Units: `y`/`year`, `m`/`month`, `w`/`week`, `d`/`day`, `h`/`hour`, `minute`, `s`/`seconds`, or a number 1–7 = how many units to show. `[created_at time_ago=3]` → "2 weeks 1 day 23 hours". **Works only in Views, emails, and success messages — not form calculations** |
+| Time ago | `[x time_ago=3]` | Elapsed time from a saved date. Units: `y`/`year`, `m`/`month`, `w`/`week`, `d`/`day`, `h`/`hour`, `minute`, `s`/`seconds`, or a number 1–7 = how many units to show. `[created-at time_ago=3]` → "2 weeks 1 day 23 hours". **Works only in Views, emails, and success messages — not form calculations** |
 | Number format | `[x decimal=2 dec_point="." thousands_sep=","]` | Currency: `$[x decimal=2 dec_point="." thousands_sep=","]`. European: `[x decimal=2 dec_point="," thousands_sep="."]` |
 | Strip HTML | `[x striphtml=1]` | Removes all HTML tags |
 | Keep JS | `[x keepjs=1]` | Preserves JavaScript/iframes (iframe display needs a custom PHP filter) |
@@ -114,10 +115,10 @@ Available in both Views and form-action content (email/confirmation) unless note
 | `[id]` | Entry ID. ⚠ Inside form Customize HTML, `[id]` means the *field's* ID instead (section 10) |
 | `[key]` | Entry key. Same caveat inside Customize HTML |
 | `[ip]` | Submitter's IP address (public IPv4) |
-| `[created_at]` | Submission date/time. Default rendering like "2021-09-20 at 9:05 pm". `[created_at format='H:i:s']` → "21:05:04"; `[created_at format='g:i a']` → "9:05 pm". The email-notifications page also writes it hyphenated: `[created-at format="F j, Y"]` — both spellings appear in the KB |
-| `[updated_at]` | Last-updated date/time (relevant when editing enabled); same `format=` support |
+| `[created-at]` | Submission date/time. Default rendering like "2021-09-20 at 9:05 pm". `[created-at format='H:i:s']` → "21:05:04"; `[created-at format='g:i a']` → "9:05 pm". `[created_at]` is the same tag (see § "Dashes vs underscores") |
+| `[updated-at]` | Last-updated date/time (relevant when editing enabled); same `format=` support |
 | `[updated-by]` | Display name of the user who last edited the entry |
-| `[post_id]` | ID of the post created by the entry (only if the form creates posts) / post containing the form |
+| `[post-id]` | ID of the post created by the entry (only if the form creates posts) / post containing the form |
 | `[form_name]` | Name of the form |
 | `[siteurl]` | WordPress site URL (Settings → General) |
 | `[sitename]` | Site/blog title |
@@ -127,6 +128,31 @@ Available in both Views and form-action content (email/confirmation) unless note
 | `[admin-link]` | Link to edit the entry in wp-admin. **Documented only on the email-notifications page — treat as email-body-only.** Not a general/View helper |
 | `[default-email]` | Admin email set in Formidable → Global Settings |
 | `[default-from-email]` | Default sender from Global Settings |
+
+### Dashes vs underscores
+
+Both engines normalize a dashed tag to its underscored form before resolving it, so either spelling renders identically — **this is not a Pro-only feature**:
+
+- Lite, `FrmFieldsHelper::get_shortcode_value()` — a blanket `str_replace( '-', '_', $tag )`.
+- Pro, `FrmProContent::maybe_replace_dash()` — a whitelist: `created-at`, `updated-at`, `created-by`, `updated-by`, `post-id`, `parent-id`, `is-draft`.
+
+Pro's whitelist is the narrower of the two, so treat those seven as the portable set.
+
+**Prefer the dashed spelling in shortcode content.** It reads better, and it is what Formidable's own UI emits (the Dynamic-field `show=` dropdown writes `show="created-at"`; Lite reserves `created-at`, not `created_at`, as a field key in `prevent_numeric_and_reserved_keys()`).
+
+Three limits, all verified by rendering against a live entry:
+
+1. **Only those seven tags.** Every other underscored tag (`[form_name]`, `[user_agent]`, `[post_status]`…) is outside Pro's whitelist — a dash there survives into the lookup and the shortcode prints literally. Parity is what the whitelist buys: where a tag resolves at all, both spellings resolve the same; where it does not, neither spelling helps.
+2. **Tag position only.** Attribute names and values are matched exactly and must stay underscored: `order_by="created_at"`, `x_axis="created_at"`, `created_at_greater_than="-1 month"`, and the magic comparison value in `[if updated_at greater_than="created_at"]` (compared with `===` against `'created_at'`). This is separate from stored settings, which are not shortcodes at all and always use `created_at` (view `order_by`, API payloads, DB columns).
+3. **⚠ Conditionals: the closing tag does not accept a dash.** `check_conditional_shortcode()` builds the closer from the *already-normalized* tag, so it searches for `[/if created_at]`:
+
+   ```
+   [if created-at]…[/if created-at]   ✗ renders literally, the whole block leaks to the page
+   [if created-at]…[/if]              ✓ the bare closer is the documented fallback
+   [if created_at]…[/if created_at]   ✓ matched pair
+   ```
+
+   Keep conditionals underscored on both ends — a matched pair survives someone later editing one half.
 
 ### `[default-message]` — dynamic all-fields table (email + confirmation)
 

@@ -397,7 +397,7 @@ Get field keys with the `formidable-forms/list-fields` ability (pass the form ID
 
 All shortcode syntax used inside view content — field display/formatting parameters, date/number formatting, `[if]` conditionals, `[foreach]`, `[frm-stats]`/`[frm-math]`/`[frm-graph]`, `[frm-search]`/`[frm-letter-filter]`, `[get param]`, `[editlink]`/`[deletelink]`/`[detaillink]`, and `[display-frm-data]` publishing parameters — is documented ONLY in `shortcodes.md`. Read it; do not work from memory.
 
-A divergent copy of that material previously lived here and contained wrong parameter names (`show_label=`, `is_link=`, `html=`, `format="currency"`, `type="bar"`, `type="donut"`, `[frm-stats type=sum]`, `[if ... is_blank]`, `[frm-search id= param=]`, `[entry_date]`). It was removed deliberately — the canonical forms are `show="field_label"`, `clickable=1`, `striphtml=1`, `decimal=`, `type="hbar"`, `pie_hole=`, `type=total`, `is_blank`→use `equals=""`-style operators from shortcodes.md §3, `[frm-search post_id=]`, `[created_at format=]`.
+A divergent copy of that material previously lived here and contained wrong parameter names (`show_label=`, `is_link=`, `html=`, `format="currency"`, `type="bar"`, `type="donut"`, `[frm-stats type=sum]`, `[if ... is_blank]`, `[frm-search id= param=]`, `[entry_date]`). It was removed deliberately — the canonical forms are `show="field_label"`, `clickable=1`, `striphtml=1`, `decimal=`, `type="hbar"`, `pie_hole=`, `type=total`, `is_blank`→use `equals=""`-style operators from shortcodes.md §3, `[frm-search post_id=]`, `[created-at format=]`.
 
 ### View Configuration Options
 
