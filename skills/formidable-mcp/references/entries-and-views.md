@@ -470,7 +470,16 @@ The card frame (background, border, radius, padding) comes from **box 0's `style
 </div>
 ```
 
-Boxes get `.frm{n}` classes that Formidable already styles as `grid-column: span n` — `frm12` full width, `frm6` half, `frm4` third, `frm3` quarter. `frm_no_grid_750` collapses the row to stacked below 750px. You don't write any of that CSS.
+Boxes get `.frm{n}` classes that Formidable already styles as `grid-column: span n` on the 12-column grid — `frm12` full width, `frm9` three-quarters, `frm8` two-thirds, `frm6` half, `frm4` a third, `frm3` a quarter. You don't write any of that CSS.
+
+**Responsive collapse.** With `grid_responsive` on (the default), Formidable adds `frm_no_grid_750` — the media rule is `@media only screen and (max-width: 750px) { .frm_grid_container.frm_no_grid_750 > div { grid-column: span 12 / span 12 } }`. **Which element gets the class depends on `grid_column_count`, and the two cases collapse different things** (verified at a 700px viewport):
+
+| `grid_column_count` | Class lands on | Below 750px |
+|---|---|---|
+| 2, 3, 4, 6, 12 | the **view root** | **cards** go one per row; boxes inside a row keep their `frm{n}` spans |
+| 1 or unset | the **layout row** | the row's **boxes** each go full width and stack; there is only one card per row anyway |
+
+So a multi-column gallery becomes single-column on mobile automatically, but a multi-box row inside a card does *not* — if a card's internal columns must stack on narrow screens, write that media query yourself in Custom CSS.
 
 **Columns and gaps — `frm_options` keys**, set via the `options` parameter:
 
@@ -479,7 +488,8 @@ Boxes get `.frm{n}` classes that Formidable already styles as `grid-column: span
 | `grid_column_count` | **Cards per row.** Only `2`, `3`, `4`, `6`, `12` are mapped (→ `span 6/4/3/2/1`); anything else, including `1` and unset, means one full-width card per row (`FrmViewsDisplaysController::get_grid_column_style_from_column_count()`). |
 | `grid_row_gap` | Row gap in **px**. Default `20`. |
 | `grid_column_gap` | Column gap in **%**. Default `2`. |
-| `grid_classes` | Extra space-separated classes appended to the view root. |
+| `grid_responsive` | `1` (the default) adds the `frm_no_grid_750` breakpoint class — see "Responsive collapse" above. `0` disables it. |
+| `grid_classes` | Extra space-separated classes appended to the view root (verified: `"my-custom-grid another-class"` both land on the root div). |
 
 > **Gotcha — Custom CSS cannot change the column count.** Views writes `--v-tl-grid-column` as an **inline style on the view root**, so a `listing_page_custom_css` rule setting that variable (or `grid-column` on the card) always loses to it, silently: the CSS saves, scopes, and renders, and the layout simply doesn't change. Set `grid_column_count` instead. Verified by inspecting the computed style.
 
@@ -530,7 +540,25 @@ Each content box is added to the listing layout automatically, **one row per box
  "data": [{"id": 0, "layout": 2, "boxes": [{"id": 1}, {"id": 3}]}]}
 ```
 
-`layout` is the number of columns in that row, which is what turns the boxes into `.frm6` + `.frm6`. `list-view-layouts` takes an optional `type` filter (`listing` or `detail` only). Detail pages need their own `type: "detail"` layout — see "Detail pages" below.
+`layout` is **not** simply a column count — it's a preset id, and five of the nine are asymmetric splits (`FrmViewsLayoutHelper::get_layout_wrapper_class()`):
+
+| `layout` | Split | Box classes, in order |
+|---|---|---|
+| `1` | full width | `frm12` |
+| `2` | halves | `frm6`, `frm6` |
+| `3` | thirds | `frm4`, `frm4`, `frm4` |
+| `4` | quarters | `frm3`, `frm3`, `frm3`, `frm3` |
+| `5` | 25 / 75 | `frm3`, `frm9` |
+| `6` | 75 / 25 | `frm9`, `frm3` |
+| `7` | 25 / 50 / 25 | `frm3`, `frm6`, `frm3` |
+| `8` | 33 / 67 | `frm4`, `frm8` |
+| `9` | 67 / 33 | `frm8`, `frm4` |
+
+Anything else yields no class at all (the box renders unstyled), so don't pass a raw column count above 4. Verified end-to-end: `layout: 3` → three `frm4`; `layout: 7` → `frm3`/`frm6`/`frm3` measuring 62/128/62px.
+
+`list-view-layouts` takes an optional `type` filter (`listing` or `detail` only). Detail pages need their own `type: "detail"` layout — see "Detail pages" below.
+
+> **Gotcha — a grid showing fewer cards than the form has entries is usually pagination, not a filter.** `options.page_size` (with `ajax_pagination`) caps how many entries render per page, and it is *separate* from `limit`. A view with `page_size: "3"` renders three cards and, with `ajax_pagination` on and only one page's worth of extra entries, may show **no visible pagination links at all** — so it just looks like entries are missing. Check `page_size` in `get-view` before suspecting `order_by`, filters, or the entries themselves; clear it with `options: {"page_size": ""}`. Count the rendered cards against `list-entries` as part of verifying any view.
 
 **Sizing sanity check.** `grid_column_count` divides the *theme's content column*, not the window. In a typical ~580px single-post column, 3 cards land at ~186px each and text wraps badly; 2 cards at ~280px read well. Measure the rendered card width before settling on a column count rather than assuming 3- or 4-up looks good.
 
