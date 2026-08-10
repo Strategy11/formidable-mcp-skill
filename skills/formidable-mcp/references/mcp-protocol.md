@@ -100,7 +100,7 @@ printf '%s\n' \
 Requirements & hosting gotchas:
 
 - **WordPress requires HTTPS** for application passwords by default (local `.local`/`.test` environments are exempted as "local"). If the Application Passwords section is missing from the profile screen, the site is plain HTTP on a non-local host.
-- **Self-signed certs** (Local by Flywheel, Laravel Valet, etc.): add `-k` to every curl call.
+- **Self-signed certs** (Local by Flywheel, Laravel Valet, DDEV, etc.): trust the environment's local CA rather than disabling verification — Local has "Trust" beside the site's SSL entry, Valet has `valet trust`, DDEV has `mkcert -install`. Failing that, point curl at the certificate with `--cacert /path/to/local-ca.pem`. Reach for `-k` only as a temporary local workaround, never against a remote site.
 - **Some hosts strip the `Authorization` header** before it reaches PHP (common on Apache CGI/FastCGI). Symptom: valid credentials always return `401`/`rest_not_logged_in`. Fix in `.htaccess`: `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1` (or `CGIPassAuth On` on Apache 2.4.13+).
 - The MCP endpoint is served by the Formidable API add-on's MCP adapter — if `/wp-json/mcp/formidable-mcp` 404s, confirm that plugin is active and permalinks aren't set to "Plain".
 
@@ -154,7 +154,7 @@ AUTH="USERNAME:APPLICATION_PASSWORD"
 SESSION_FILE="$DIR/.mcp-session"
 
 init_session() {
-  curl -s -i -k -X POST "$URL" \
+  curl -s -i -X POST "$URL" \
     -H "Content-Type: application/json" \
     -u "$AUTH" \
     -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
@@ -165,7 +165,7 @@ call() {
   local ability="$1" params="$2" body
   body=$(jq -n --arg a "$ability" --argjson p "$params" \
     '{jsonrpc:"2.0",method:"tools/call",params:{name:"mcp-adapter-execute-ability",arguments:{ability_name:$a,parameters:$p}},id:2}')
-  curl -s -k -X POST "$URL" \
+  curl -s -X POST "$URL" \
     -H "Content-Type: application/json" \
     -H "Mcp-Session-Id: $(cat "$SESSION_FILE" 2>/dev/null || true)" \
     -u "$AUTH" -d "$body" 2>/dev/null
@@ -184,7 +184,7 @@ echo "$out" | jq '.result.structuredContent // (.result.content[0].text | fromjs
 # to index the string with "result" and errors out instead of printing the envelope.
 ```
 
-Notes: fill in `URL` and `AUTH`; drop `-k` on sites with real certificates. Output is the normalized `{success, data, error}` object, so calls read like `./mcp.sh formidable-forms/create-field '{"form_id":"123","type":"text","name":"My Field"}' | jq '.data.id'`. Keep `.mcp-session` out of version control.
+Notes: fill in `URL` and `AUTH`. Output is the normalized `{success, data, error}` object, so calls read like `./mcp.sh formidable-forms/create-field '{"form_id":"123","type":"text","name":"My Field"}' | jq '.data.id'`. Keep `.mcp-session` out of version control.
 
 **zsh users — never `echo "$json" | jq`.** zsh's builtin `echo` interprets backslash escapes, so JSON containing `\"` or `\n` sequences (any response carrying HTML content) gets corrupted and jq fails with `Invalid string: control characters ... must be escaped` — *after* the API call already succeeded, which reads like a phantom failure and invites a duplicate retry. Capture responses to a file and run `jq ... file.json`, or use `printf '%s\n' "$json" | jq`. (The bundled `scripts/frm-mcp` helper is unaffected — it runs under bash, whose `echo` doesn't interpret escapes.)
 
@@ -598,7 +598,7 @@ All ability responses follow this pattern:
 
 ### curl: SSL certificate problem (self-signed)
 **Cause:** Local dev environments (Local by Flywheel, Valet, DDEV) use self-signed certificates.
-**Fix:** Add `-k` to curl calls on local sites only — don't blanket-disable verification against production sites.
+**Fix:** Trust the environment's local CA — Local by Flywheel has a "Trust" button next to the site's SSL certificate, Valet has `valet trust`, DDEV has `mkcert -install`. Once trusted, curl verifies normally and nothing needs to change per call. If you can't trust the CA, pass `--cacert /path/to/local-ca.pem`. Disabling verification with `-k` is a last-resort local workaround: it silently accepts any certificate, so never use it against a remote or production site. The bundled `scripts/frm-mcp` gates it behind `FRM_MCP_INSECURE=1` for exactly this reason.
 
 ### 404 on `/wp-json/mcp/formidable-mcp`
 **Cause:** The Formidable API add-on (which ships the MCP adapter) isn't active, or permalinks are set to "Plain".

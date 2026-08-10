@@ -10,7 +10,7 @@ All examples below use the Formidable MCP HTTP endpoint. Initialize a session on
 SESSION=$(curl -s -i -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
   -u "admin:APP_PASSWORD" \
   -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
-  -k 2>&1 | grep -i "mcp-session-id" | cut -d' ' -f2 | tr -d '\r')
+  2>&1 | grep -i "mcp-session-id" | cut -d' ' -f2 | tr -d '\r')
 ```
 
 All abilities are invoked through the `mcp-adapter-execute-ability` tool with an `ability_name` and `parameters`.
@@ -39,7 +39,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent.data[] | {id, form_id, created_at, user_id}'
+  }' 2>&1 | jq '.result.structuredContent.data[] | {id, form_id, created_at, user_id}'
 ```
 
 ### Get a Specific Entry
@@ -64,7 +64,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent.data'
+  }' 2>&1 | jq '.result.structuredContent.data'
 ```
 
 The response's `meta` object is keyed by **field_key**, not field ID (`"meta": {"9qiak": "Paris", ...}`) — even though `create-entry`/`update-entry` accept IDs. Map keys via `list-fields` before asserting on values. Some field types add derived companion metas: a `quiz_score` field stores its display value under its own key (`"fnzkj": "3/5"`) plus a numeric copy under `"<field_key>-value"` (`"fnzkj-value": "3"`) — use the `-value` meta (or `get-stats` on the field ID) for numeric comparisons.
@@ -95,7 +95,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent.data'
+  }' 2>&1 | jq '.result.structuredContent.data'
 ```
 
 ## Entry Management
@@ -124,7 +124,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent.data'
+  }' 2>&1 | jq '.result.structuredContent.data'
 ```
 
 ### Update an Entry
@@ -150,7 +150,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent.data'
+  }' 2>&1 | jq '.result.structuredContent.data'
 ```
 
 ### Delete an Entry
@@ -175,7 +175,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent'
+  }' 2>&1 | jq '.result.structuredContent'
 ```
 
 ## Creating Views
@@ -231,7 +231,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent.data | {id, name, form_id, content, limit}'
+  }' 2>&1 | jq '.result.structuredContent.data | {id, name, form_id, content, limit}'
 ```
 
 The create/update responses (and `get-view`) include `content` and `limit` — verify with `get-view`.
@@ -317,7 +317,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent.data | {id, title, content, limit}'
+  }' 2>&1 | jq '.result.structuredContent.data | {id, title, content, limit}'
 ```
 
 ### CSV export button on a view (Export View add-on)
@@ -480,7 +480,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent.data | to_entries[] | "\(.value.name) => [\(.value.field_key)]"'
+  }' 2>&1 | jq '.result.structuredContent.data | to_entries[] | "\(.value.name) => [\(.value.field_key)]"'
 ```
 
 ```html
@@ -525,7 +525,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent.data[] | {id, title, slug, form_id}'
+  }' 2>&1 | jq '.result.structuredContent.data[] | {id, title, slug, form_id}'
 ```
 
 Get a specific view — ability: `formidable-forms/get-view`
@@ -548,7 +548,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent.data'
+  }' 2>&1 | jq '.result.structuredContent.data'
 ```
 
 ## Field Statistics: `formidable-forms/get-stats`

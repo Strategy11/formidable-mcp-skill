@@ -70,7 +70,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent.data[] | {id, name}'
+  }' 2>&1 | jq '.result.structuredContent.data[] | {id, name}'
 
 # Get a specific style
 curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
@@ -90,7 +90,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent.data'
+  }' 2>&1 | jq '.result.structuredContent.data'
 ```
 
 ## Assigning Styles to Forms
@@ -114,7 +114,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent'
+  }' 2>&1 | jq '.result.structuredContent'
 ```
 
 Assignment sets `custom_style` in the form's options (verify with a form-options query: expect e.g. `custom_style: "15"`).
@@ -157,7 +157,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent'
+  }' 2>&1 | jq '.result.structuredContent'
 ```
 
 ## Common Workflow: Create a Style and Apply It to a Form
@@ -169,7 +169,7 @@ STYLE_ID=$(curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" 
   -H "Mcp-Session-Id: $SESSION" \
   -u "admin:APP_PASSWORD" \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-style","parameters":{"name":"My New Style"}}},"id":2}' \
-  -k 2>&1 | jq -r '.result.structuredContent.data.id')
+  2>&1 | jq -r '.result.structuredContent.data.id')
 
 # 2. Assign to form
 curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
@@ -190,7 +190,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     \"id\": 2
-  }" -k 2>&1 | jq '.result.structuredContent'
+  }" 2>&1 | jq '.result.structuredContent'
 ```
 
 ## Complete Style Properties Reference

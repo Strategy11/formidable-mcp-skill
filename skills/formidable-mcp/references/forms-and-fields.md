@@ -21,7 +21,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       "clientInfo": {"name": "claude", "version": "1.0"}
     },
     "id": 1
-  }' -k -i 2>&1 | grep -i "mcp-session-id" | head -1 | cut -d' ' -f2 | tr -d '\r'
+  }' -i 2>&1 | grep -i "mcp-session-id" | head -1 | cut -d' ' -f2 | tr -d '\r'
 ```
 
 **2. Call abilities with the session ID:**
@@ -45,7 +45,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
       }
     },
     "id": 2
-  }' -k 2>&1 | jq '.result.structuredContent.data | {id, form_key, name}'
+  }' 2>&1 | jq '.result.structuredContent.data | {id, form_key, name}'
 ```
 
 **Session management rules:**

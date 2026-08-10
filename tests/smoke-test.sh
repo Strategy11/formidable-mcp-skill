@@ -8,24 +8,46 @@
 #   FRM_MCP_AUTH="username:application password" \
 #   ./smoke-test.sh
 #
+# Run this against a DEVELOPMENT site — it creates and deletes real objects.
+#
+# TLS is verified by default. For a local self-signed certificate, trust the
+# environment's CA, or set FRM_MCP_CACERT=/path/to/ca.pem. FRM_MCP_INSECURE=1
+# skips verification altogether — local hosts only.
+#
 # Requires: curl, jq. Exit code 0 = all pass.
 
 set -u
 : "${FRM_MCP_URL:?Set FRM_MCP_URL to the MCP endpoint}"
 : "${FRM_MCP_AUTH:?Set FRM_MCP_AUTH to user:app-password}"
 
+# TLS options for every curl below. Expanded with the ${arr[@]+...} guard because
+# bash 3.2 (stock on macOS) errors on a bare "${arr[@]}" for an empty array under `set -u`.
+TLS_OPTS=()
+if [ -n "${FRM_MCP_CACERT:-}" ]; then
+  TLS_OPTS+=(--cacert "$FRM_MCP_CACERT")
+elif [ "${FRM_MCP_INSECURE:-0}" = "1" ]; then
+  case "$FRM_MCP_URL" in
+    https://*.local/*|https://*.test/*|https://localhost*|https://127.0.0.1*)
+      TLS_OPTS+=(-k) ;;
+    *)
+      echo "FATAL: refusing FRM_MCP_INSECURE=1 for a non-local host." >&2
+      echo "       Trust the site's CA or set FRM_MCP_CACERT instead." >&2
+      exit 2 ;;
+  esac
+fi
+
 PASS=0; FAIL=0; FAILED_NAMES=()
 FORM_ID=""; CHILD_ID=""; VIEW_ID=""; STYLE_ID=""; ACTION_ID=""; APP_ID=""; ENTRY_ID=""
 
 SESSION=$(curl -s -i -X POST "$FRM_MCP_URL" -u "$FRM_MCP_AUTH" -H 'Content-Type: application/json' \
   --data-binary '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"smoke-test","version":"1.0"}},"id":1}' \
-  -k 2>&1 | grep -i "mcp-session-id" | cut -d' ' -f2 | tr -d '\r')
+  ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} 2>&1 | grep -i "mcp-session-id" | cut -d' ' -f2 | tr -d '\r')
 [ -n "$SESSION" ] || { echo "FATAL: could not initialize MCP session"; exit 2; }
 
 mcp() { # mcp <ability> <params-json> -> structuredContent JSON on stdout
   curl -s -X POST "$FRM_MCP_URL" -H "Content-Type: application/json" -H "Mcp-Session-Id: $SESSION" -u "$FRM_MCP_AUTH" \
     -d "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"mcp-adapter-execute-ability\",\"arguments\":{\"ability_name\":\"formidable-forms/$1\",\"parameters\":$2}},\"id\":2}" \
-    -k | jq -c '.result.structuredContent // {success:false,error:(.result.content[0].text // .error.message // "unknown")}'
+    ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} | jq -c '.result.structuredContent // {success:false,error:(.result.content[0].text // .error.message // "unknown")}'
 }
 
 check() { # check <name> <actual> <expected-substring-or-value>

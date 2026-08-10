@@ -19,8 +19,12 @@
 #   WP_USERNAME="admin"
 #   APPLICATION_PASSWORD="xxxx xxxx xxxx xxxx xxxx xxxx"
 #
+# TLS is verified by default. For a local site with a self-signed certificate,
+# prefer trusting the environment's CA (Local by Flywheel's "Trust" button,
+# `valet trust`, `mkcert -install`), or set FRM_MCP_CACERT to the CA file.
+# FRM_MCP_INSECURE=1 disables verification outright — local use only.
+#
 # Dependencies: curl, jq. Ruby (stock on macOS) is used only for YAML bodies.
-# -k is passed to curl for self-signed local certs; remove it for production.
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 [ -f "$DIR/frm-mcp.env" ] && . "$DIR/frm-mcp.env"
@@ -31,6 +35,23 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 URL="${SITE_URL%/}/wp-json/mcp/formidable-mcp"
 AUTH="$WP_USERNAME:$APPLICATION_PASSWORD"
 SESSION_FILE="$DIR/.mcp-session"
+
+# Build the TLS options curl runs with. Expanded as ${TLS_OPTS[@]+"${TLS_OPTS[@]}"}
+# below — under `set -u`, bash 3.2 (stock on macOS) treats a bare "${arr[@]}" on an
+# empty array as an unbound variable.
+TLS_OPTS=()
+if [ -n "${FRM_MCP_CACERT:-}" ]; then
+  TLS_OPTS+=(--cacert "$FRM_MCP_CACERT")
+elif [ "${FRM_MCP_INSECURE:-0}" = "1" ]; then
+  case "$URL" in
+    https://*.local/*|https://*.test/*|https://localhost*|https://127.0.0.1*)
+      TLS_OPTS+=(-k) ;;
+    *)
+      echo "frm-mcp: refusing FRM_MCP_INSECURE=1 for a non-local host ($SITE_URL)." >&2
+      echo "         Trust the site's CA or set FRM_MCP_CACERT instead." >&2
+      exit 1 ;;
+  esac
+fi
 
 ability="$1"
 body_arg="${2:-}"
@@ -45,7 +66,7 @@ else
 fi
 
 init_session() {
-  curl -s -i -k -X POST "$URL" \
+  curl -s -i ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
     -H "Content-Type: application/json" \
     -u "$AUTH" \
     -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
@@ -56,7 +77,7 @@ call() {
   local body
   body=$(jq -n --arg a "$ability" --argjson p "$params" \
     '{jsonrpc:"2.0",method:"tools/call",params:{name:"mcp-adapter-execute-ability",arguments:{ability_name:$a,parameters:$p}},id:2}')
-  curl -s -k -X POST "$URL" \
+  curl -s ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
     -H "Content-Type: application/json" \
     -H "Mcp-Session-Id: $(cat "$SESSION_FILE" 2>/dev/null || true)" \
     -u "$AUTH" -d "$body" 2>/dev/null
