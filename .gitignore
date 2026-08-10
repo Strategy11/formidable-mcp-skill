@@ -1,0 +1,6 @@
+# macOS
+.DS_Store
+
+# Local, machine-specific config and credentials — never commit
+frm-mcp.env
+.mcp-session

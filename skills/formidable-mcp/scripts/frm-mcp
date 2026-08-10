@@ -1,0 +1,73 @@
+#!/bin/bash
+# frm-mcp — call a Formidable MCP ability over the HTTP transport with a
+# human-readable body. Handles session init, expiry, and retry automatically.
+#
+# Usage:
+#   frm-mcp <ability-name> '<json-body>'      # pretty-printed JSON, shown as-is in permission prompts
+#   frm-mcp <ability-name> '<yaml-body>'      # YAML also accepted (JSON is tried first)
+#   frm-mcp <ability-name>                    # empty parameters
+#
+# Examples:
+#   frm-mcp formidable-forms/list-forms
+#   frm-mcp formidable-forms/create-entry '{"form_id": "123", "456": "value"}'
+#
+# Configuration comes from env vars SITE_URL, WP_USERNAME, APPLICATION_PASSWORD,
+# falling back to a frm-mcp.env file next to this script — so secrets never
+# appear on the command line or in permission prompts. frm-mcp.env is
+# machine-specific: create it locally and never commit it. Example:
+#   SITE_URL="https://your-site.local"
+#   WP_USERNAME="admin"
+#   APPLICATION_PASSWORD="xxxx xxxx xxxx xxxx xxxx xxxx"
+#
+# Dependencies: curl, jq. Ruby (stock on macOS) is used only for YAML bodies.
+# -k is passed to curl for self-signed local certs; remove it for production.
+set -euo pipefail
+DIR="$(cd "$(dirname "$0")" && pwd)"
+[ -f "$DIR/frm-mcp.env" ] && . "$DIR/frm-mcp.env"
+: "${SITE_URL:?Set SITE_URL (env or frm-mcp.env)}"
+: "${WP_USERNAME:?Set WP_USERNAME (env or frm-mcp.env)}"
+: "${APPLICATION_PASSWORD:?Set APPLICATION_PASSWORD (env or frm-mcp.env)}"
+
+URL="${SITE_URL%/}/wp-json/mcp/formidable-mcp"
+AUTH="$WP_USERNAME:$APPLICATION_PASSWORD"
+SESSION_FILE="$DIR/.mcp-session"
+
+ability="$1"
+body_arg="${2:-}"
+
+# Body: pretty JSON preferred (validated/compacted by jq); YAML fallback via ruby
+if [ -n "$body_arg" ]; then
+  if ! params=$(printf '%s' "$body_arg" | jq -c '.' 2>/dev/null); then
+    params=$(printf '%s' "$body_arg" | ruby -ryaml -rjson -e 'puts JSON.generate(YAML.safe_load(STDIN.read) || {})')
+  fi
+else
+  params='{}'
+fi
+
+init_session() {
+  curl -s -i -k -X POST "$URL" \
+    -H "Content-Type: application/json" \
+    -u "$AUTH" \
+    -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
+    2>/dev/null | grep -i "mcp-session-id" | head -1 | cut -d' ' -f2 | tr -d '\r' > "$SESSION_FILE"
+}
+
+call() {
+  local body
+  body=$(jq -n --arg a "$ability" --argjson p "$params" \
+    '{jsonrpc:"2.0",method:"tools/call",params:{name:"mcp-adapter-execute-ability",arguments:{ability_name:$a,parameters:$p}},id:2}')
+  curl -s -k -X POST "$URL" \
+    -H "Content-Type: application/json" \
+    -H "Mcp-Session-Id: $(cat "$SESSION_FILE" 2>/dev/null || true)" \
+    -u "$AUTH" -d "$body" 2>/dev/null
+}
+
+out=$(call)
+if echo "$out" | grep -qiE 'session not found|Missing Mcp-Session-Id|Invalid or expired'; then
+  init_session
+  out=$(call)
+fi
+# NOTE the parentheses close BEFORE the final `// .result` — binding the
+# alternative inside the pipe makes non-JSON error text crash jq instead of
+# printing the error envelope.
+echo "$out" | jq '.result.structuredContent // (.result.content[0].text | fromjson?) // .result'
