@@ -97,7 +97,9 @@ R=$(mcp get-stats "{\"field_id\":\"$FIELD_ID\",\"type\":\"count\"}")
 check "get-stats count=1" "$(jq -r ".data.\"$FIELD_ID\" // .data | tostring" <<<"$R")" "1"
 
 echo "=== Views ==="
-R=$(mcp create-view "{\"form_id\":\"$FORM_ID\",\"name\":\"Smoke View\",\"content\":\"<tr><td>[$FIELD_ID]</td></tr>\",\"before_content\":\"<table><tbody>\",\"after_content\":\"</tbody></table>\",\"limit\":1,\"options\":{\"empty_msg\":\"None found\"}}")
+# status is passed explicitly — create-view defaults to "private" (matching the
+# product), so asserting "publish" without sending it tests nothing but the default.
+R=$(mcp create-view "{\"form_id\":\"$FORM_ID\",\"name\":\"Smoke View\",\"content\":\"<tr><td>[$FIELD_ID]</td></tr>\",\"before_content\":\"<table><tbody>\",\"after_content\":\"</tbody></table>\",\"limit\":1,\"status\":\"publish\",\"options\":{\"empty_msg\":\"None found\"}}")
 VIEW_ID=$(jq -r '.data.id // empty' <<<"$R")
 check "create-view one-call" "$(jq -r '[.data.status, (.data.limit|tostring)] | join("/")' <<<"$R")" "publish/1"
 R=$(mcp update-view "{\"id\":\"$VIEW_ID\",\"content\":\"<p>updated [$FIELD_ID]</p>\",\"limit\":2}")

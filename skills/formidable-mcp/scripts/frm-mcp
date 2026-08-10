@@ -27,7 +27,18 @@
 # Dependencies: curl, jq. Ruby (stock on macOS) is used only for YAML bodies.
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# frm-mcp.env supplies defaults; real environment variables win. Sourcing the
+# file plainly would let it clobber an explicit `SITE_URL=... frm-mcp ...`,
+# which silently sends credentials to whichever host the file names.
+_env_site_url="${SITE_URL:-}"
+_env_wp_username="${WP_USERNAME:-}"
+_env_application_password="${APPLICATION_PASSWORD:-}"
 [ -f "$DIR/frm-mcp.env" ] && . "$DIR/frm-mcp.env"
+[ -n "$_env_site_url" ] && SITE_URL="$_env_site_url"
+[ -n "$_env_wp_username" ] && WP_USERNAME="$_env_wp_username"
+[ -n "$_env_application_password" ] && APPLICATION_PASSWORD="$_env_application_password"
+
 : "${SITE_URL:?Set SITE_URL (env or frm-mcp.env)}"
 : "${WP_USERNAME:?Set WP_USERNAME (env or frm-mcp.env)}"
 : "${APPLICATION_PASSWORD:?Set APPLICATION_PASSWORD (env or frm-mcp.env)}"
@@ -77,16 +88,24 @@ call() {
   local body
   body=$(jq -n --arg a "$ability" --argjson p "$params" \
     '{jsonrpc:"2.0",method:"tools/call",params:{name:"mcp-adapter-execute-ability",arguments:{ability_name:$a,parameters:$p}},id:2}')
-  curl -s ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
+  # Keep curl's stderr: a TLS or DNS failure returns no body, and silently
+  # printing nothing reads like an empty result rather than a broken connection.
+  curl -sS ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
     -H "Content-Type: application/json" \
     -H "Mcp-Session-Id: $(cat "$SESSION_FILE" 2>/dev/null || true)" \
-    -u "$AUTH" -d "$body" 2>/dev/null
+    -u "$AUTH" -d "$body"
 }
 
 out=$(call)
 if echo "$out" | grep -qiE 'session not found|Missing Mcp-Session-Id|Invalid or expired'; then
   init_session
   out=$(call)
+fi
+if [ -z "$out" ]; then
+  echo "frm-mcp: no response from $URL (see the curl error above)." >&2
+  echo "         A certificate error here means TLS is working as intended —" >&2
+  echo "         trust the site's CA or set FRM_MCP_CACERT rather than FRM_MCP_INSECURE." >&2
+  exit 1
 fi
 # NOTE the parentheses close BEFORE the final `// .result` — binding the
 # alternative inside the pipe makes non-JSON error text crash jq instead of
