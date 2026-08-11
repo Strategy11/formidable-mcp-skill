@@ -5,7 +5,7 @@ Read this when: you need to connect to, configure, or call the Formidable Forms 
 ## Access policy (mandatory)
 
 - **Use the Formidable MCP exclusively for ALL operations** — creates, updates, deletes, and normal reads. **Never fall back to the Formidable REST API** (`/wp-json/frm/v3/` current or `/wp-json/frm/v2/` legacy endpoints). MCP is the intended abstraction layer; REST fallbacks circumvent its validation and permission model.
-- Recommended: enforce this in your project by **deny-listing** the REST endpoints in `.claude/settings.json`, leaving only the MCP endpoint reachable by curl:
+- Recommended: enforce this in your project by **deny-listing** the REST endpoints wherever your client configures command permissions (`.claude/settings.json` in Claude Code; other clients have an equivalent allow/deny list), leaving only the MCP endpoint reachable by curl:
   ```json
   "deny": [
     "Bash(curl * /wp-json/frm*)",
@@ -60,24 +60,38 @@ Both transports expose identical abilities and accept identical `tools/call` bod
 
 Run the adapter as a local stdio MCP server through WP-CLI — no HTTP auth or session headers needed.
 
-### Claude Code config (`.mcp.json`)
+### MCP client config
+
+Any MCP client that can launch a stdio server works. The server definition itself is identical everywhere — only the file it lives in, and the key it nests under, differ by client:
 
 ```json
 {
-  "formidable": {
-    "type": "stdio",
-    "command": "wp",
-    "args": [
-      "--path=/path/to/wordpress",
-      "mcp-adapter",
-      "serve",
-      "--server=formidable-mcp",
-      "--user=1"
-    ],
-    "env": {}
+  "mcpServers": {
+    "formidable": {
+      "type": "stdio",
+      "command": "wp",
+      "args": [
+        "--path=/path/to/wordpress",
+        "mcp-adapter",
+        "serve",
+        "--server=formidable-mcp",
+        "--user=1"
+      ],
+      "env": {}
+    }
   }
 }
 ```
+
+| Client | Config file | Wrapper key |
+|---|---|---|
+| Claude Code | `.mcp.json` in the project root (or add it with `claude mcp add`) | `mcpServers` |
+| Claude Desktop | `claude_desktop_config.json` — macOS `~/Library/Application Support/Claude/`, Windows `%APPDATA%\Claude\` | `mcpServers` |
+| Cursor | `.cursor/mcp.json` in the project, or `~/.cursor/mcp.json` globally | `mcpServers` |
+| VS Code (agent mode) | `.vscode/mcp.json` | `servers` |
+| Anything else | see that client's MCP documentation | usually `mcpServers` |
+
+Locations move between releases — if one doesn't match what you see, the client's own MCP docs are authoritative. After saving, restart or reload the client so it launches the server, then confirm it appears in the client's MCP server list (in Claude Code, `/mcp`).
 
 Key points:
 - `--path` — absolute path to the WordPress install root
@@ -134,7 +148,7 @@ Sessions expire after inactivity, and hand-rolling every curl call is error-pron
 ./scripts/frm-mcp formidable-forms/create-entry '{"form_id": "123", "456": "value"}'
 ```
 
-The helper reads `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD` from `frm-mcp.env` (env vars of the same names override it, which is for CI and scripted use — don't put a real password in a command prefix). Secrets never appear on the command line, so they never show in permission prompts either. A permissions tip for Claude Code: prefix-based Bash allow rules can permanently allow read-only calls (`frm-mcp formidable-forms/list-*`, `get-*`) while `create-*`/`update-*`/`delete-*` still prompt.
+The helper reads `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD` from `frm-mcp.env` (env vars of the same names override it, which is for CI and scripted use — don't put a real password in a command prefix). Secrets never appear on the command line, so they never show in permission prompts either. If your client gates shell commands behind per-call approval — Claude Code, for example — prefix-based allow rules pair well with this: permanently allow read-only calls (`frm-mcp formidable-forms/list-*`, `get-*`) while `create-*`/`update-*`/`delete-*` keep prompting.
 
 ### Under the hood — the session protocol
 

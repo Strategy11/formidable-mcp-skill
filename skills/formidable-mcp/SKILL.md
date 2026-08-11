@@ -1,6 +1,6 @@
 ---
 name: formidable-mcp
-description: Create, query, and manage everything in Formidable Forms via MCP — forms, fields, repeaters, entries, views, styles, form actions (email/confirmation/webhook), applications, PDF downloads, templates, and troubleshooting known MCP bugs
+description: Create, query, and manage everything in Formidable Forms via MCP — first-time setup and connecting a site, forms, fields, repeaters, entries, views, styles, form actions (email/confirmation/webhook), applications, PDF downloads, templates, and troubleshooting known MCP bugs
 ---
 
 ## Overview

@@ -17,24 +17,26 @@ When both apply, prefer the WP-CLI bridge: no credential exists to leak.
 
 ### 1. Install the skill
 
-As a Claude Code plugin:
+In Claude Code, as a plugin:
 
 ```
 /plugin marketplace add Strategy11/formidable-mcp-skill
 /plugin install formidable-mcp@formidable
 ```
 
-Or by hand:
+Anywhere else — a personal or project skills directory, or another agent entirely — clone it and put the skill directory where your tool looks for skills or instructions:
 
 ```bash
 git clone https://github.com/Strategy11/formidable-mcp-skill.git
-cp -r formidable-mcp-skill/skills/formidable-mcp ~/.claude/skills/
+cp -r formidable-mcp-skill/skills/formidable-mcp ~/.claude/skills/    # or your agent's equivalent
 ```
 
-Either way, the helper scripts land in the skill's `scripts/` directory. Find them with:
+Nothing here is tied to a particular assistant: the references are plain Markdown and the helpers are POSIX shell scripts that only need `curl` and `jq`. An agent that can read files and run commands can use this; a person with a terminal can too.
+
+However it got installed, the helper scripts live in the skill's `scripts/` directory. If you're not sure where that ended up:
 
 ```bash
-find ~/.claude -name frm-mcp-setup 2>/dev/null
+find ~ -name frm-mcp-setup -not -path '*/.git/*' 2>/dev/null
 ```
 
 The rest of this file writes that directory as `scripts/` — `cd` into it first.
@@ -103,7 +105,7 @@ From here on, plain language is enough — the skill routes itself:
 
 ## Local sites: the WP-CLI bridge (no password at all)
 
-If you have a shell on the machine hosting WordPress, skip application passwords entirely and run the adapter as a stdio MCP server. Add to `.mcp.json` in your project:
+If you have a shell on the machine hosting WordPress, skip application passwords entirely and run the adapter as a stdio MCP server. Add this to your MCP client's config file:
 
 ```json
 {
@@ -118,7 +120,11 @@ If you have a shell on the machine hosting WordPress, skip application passwords
 }
 ```
 
-Restart Claude Code, then check the connection with `/mcp`. Use the full path to the `wp` binary if it isn't on PATH. `--user=1` is the WordPress user ID to act as — it must be an administrator. Full details in `mcp-protocol.md` § "Transport 1".
+The server definition is the same for every client; where it goes is not — `.mcp.json` in the project root for Claude Code, `claude_desktop_config.json` for Claude Desktop, `.cursor/mcp.json` for Cursor, `.vscode/mcp.json` for VS Code agent mode (which nests under `servers` rather than `mcpServers`). Check your client's MCP docs if none of those match.
+
+Then reload or restart the client so it launches the server, and confirm `formidable` shows up in its MCP server list — in Claude Code that's `/mcp`; other clients have an equivalent panel or status indicator.
+
+Use the full path to the `wp` binary if it isn't on PATH. `--user=1` is the WordPress user ID to act as — it must be an administrator. Full details, including the per-client config table, are in `mcp-protocol.md` § "Transport 1".
 
 ## Onboarding someone else
 

@@ -11,9 +11,10 @@ relevant reference file before making MCP calls, so it gets the call right the f
 ## Requirements
 
 - WordPress with **Formidable Forms** and the Formidable MCP adapter available
-- An MCP connection to that site — either the WP-CLI stdio bridge (server shell access) or the HTTP
-  endpoint with an application password. Setup for both is in
-  [`skills/formidable-mcp/references/mcp-protocol.md`](skills/formidable-mcp/references/mcp-protocol.md).
+- An MCP connection to that site — either the WP-CLI stdio bridge (server shell access, no password) or the
+  HTTP endpoint with an application password. Setup for both is in
+  [`skills/formidable-mcp/references/getting-started.md`](skills/formidable-mcp/references/getting-started.md),
+  and `skills/formidable-mcp/scripts/frm-mcp-setup` checks it for you.
 - Some features referenced (repeaters, views, applications, PDFs) require Formidable Pro or add-ons;
   each reference notes where.
 
@@ -39,13 +40,21 @@ cp -r formidable-mcp-skill/skills/formidable-mcp ~/.claude/skills/
 
 Use `.claude/skills/` inside a project instead of `~/.claude/skills/` to scope it to that project.
 
+### Other agents and MCP clients
+
+Nothing here is Claude-specific below the packaging: the references are plain Markdown and the helpers are
+POSIX shell scripts needing only `curl` and `jq`. Clone the repo and point your tool at
+`skills/formidable-mcp/` — or read it yourself and drive `scripts/frm-mcp` from a terminal. The stdio bridge
+config works in any MCP client; per-client config locations are tabled in
+[`references/mcp-protocol.md`](skills/formidable-mcp/references/mcp-protocol.md) § "Transport 1".
+
 ## Quickstart: connect a site
 
 Three commands and one edit. Full walkthrough — including the no-password option for local sites — is in
 [`skills/formidable-mcp/references/getting-started.md`](skills/formidable-mcp/references/getting-started.md).
 
 ```bash
-cd skills/formidable-mcp/scripts    # after a plugin install: find ~/.claude -name frm-mcp-setup
+cd skills/formidable-mcp/scripts    # installed elsewhere? find ~ -name frm-mcp-setup 2>/dev/null
 cp frm-mcp.env.example frm-mcp.env  # then edit it — see below
 ./frm-mcp-setup                     # checks everything and says what's left to fix
 ```
