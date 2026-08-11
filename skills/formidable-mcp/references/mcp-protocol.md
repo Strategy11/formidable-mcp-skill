@@ -5,7 +5,7 @@ Read this when: you need to connect to, configure, or call the Formidable Forms 
 ## Access policy (mandatory)
 
 - **Use the Formidable MCP exclusively for ALL operations** — creates, updates, deletes, and normal reads. **Never fall back to the Formidable REST API** (`/wp-json/frm/v3/` current or `/wp-json/frm/v2/` legacy endpoints). MCP is the intended abstraction layer; REST fallbacks circumvent its validation and permission model.
-- Recommended: enforce this in your project by **deny-listing** the REST endpoints in `.claude/settings.json`, leaving only the MCP endpoint reachable by curl:
+- Recommended: enforce this in your project by **deny-listing** the REST endpoints wherever your client configures command permissions (`.claude/settings.json` in Claude Code; other clients have an equivalent allow/deny list), leaving only the MCP endpoint reachable by curl:
   ```json
   "deny": [
     "Bash(curl * /wp-json/frm*)",
@@ -21,11 +21,31 @@ Read this when: you need to connect to, configure, or call the Formidable Forms 
 ## Protocol overview
 
 - **Protocol:** MCP over JSON-RPC 2.0
-- **Protocol version:** `2024-11-25`
+- **Protocol version:** `2025-11-25` — what the adapter reports from `initialize` (`serverInfo` there also names the build, e.g. `Formidable MCP Server v1.18`). It answers with its own version regardless of what the client sends, so a stale value in a client's request is tolerated rather than rejected
 - **Transports:** HTTP POST (REST-routed MCP endpoint) or stdio via WP-CLI
 - **Content-Type:** `application/json`
 - **Session management (HTTP):** header-based (`mcp-session-id`); sessions expire after inactivity
 - **Abilities:** registered via the WordPress Abilities API, namespaced `formidable-forms/<action>`, each marked `mcp.public => true` and `show_in_rest => true`
+
+## Connecting: credentials go in a file, never in the chat
+
+Before the first call, the site URL and credentials must be somewhere the tooling can read them. **The recommended setup is a `frm-mcp.env` file next to `scripts/frm-mcp`**, created by the site owner in an editor:
+
+```bash
+cd skills/formidable-mcp/scripts
+cp frm-mcp.env.example frm-mcp.env
+# then edit frm-mcp.env and fill in SITE_URL, WP_USERNAME, APPLICATION_PASSWORD
+```
+
+The file is gitignored, so credentials stay out of version control, off the command line, and out of permission prompts — the helper reads them at call time instead.
+
+**Never ask the user to paste credentials into the conversation, and never type them into a command.** An application password sent to an AI assistant is in the transcript, in the model provider's logs, and potentially in a permission prompt or shell history — it must be rotated afterward, so treat pasted credentials as burned. This applies to every route to the same secret:
+
+- **Do:** tell the user to run the `cp` above and fill in the file themselves; then just call `frm-mcp` and let it pick the values up. If a call fails on auth, report the failure and ask them to re-check the file — do not offer to take the password "just this once".
+- **Don't:** ask "what's your application password?"; don't offer to write `frm-mcp.env` for them from values they supply in chat; don't put credentials in an inline `-u "user:password"` curl command, a `SITE_URL=… APPLICATION_PASSWORD=… frm-mcp …` prefix, or an `export` the user is told to run; don't echo, `cat`, or otherwise read the contents of `frm-mcp.env` back — checking that the file exists is enough.
+- If the user pastes a credential anyway, don't repeat it in your replies, and tell them plainly that it should be revoked and regenerated in WP Admin once the file is set up.
+
+The same rule covers the WP-CLI transport: it needs no password at all, so if the user has shell access to the WordPress host, prefer it.
 
 ## Choosing a transport
 
@@ -40,24 +60,38 @@ Both transports expose identical abilities and accept identical `tools/call` bod
 
 Run the adapter as a local stdio MCP server through WP-CLI — no HTTP auth or session headers needed.
 
-### Claude Code config (`.mcp.json`)
+### MCP client config
+
+Any MCP client that can launch a stdio server works. The server definition itself is identical everywhere — only the file it lives in, and the key it nests under, differ by client:
 
 ```json
 {
-  "formidable": {
-    "type": "stdio",
-    "command": "wp",
-    "args": [
-      "--path=/path/to/wordpress",
-      "mcp-adapter",
-      "serve",
-      "--server=formidable-mcp",
-      "--user=1"
-    ],
-    "env": {}
+  "mcpServers": {
+    "formidable": {
+      "type": "stdio",
+      "command": "wp",
+      "args": [
+        "--path=/path/to/wordpress",
+        "mcp-adapter",
+        "serve",
+        "--server=formidable-mcp",
+        "--user=1"
+      ],
+      "env": {}
+    }
   }
 }
 ```
+
+| Client | Config file | Wrapper key |
+|---|---|---|
+| Claude Code | `.mcp.json` in the project root (or add it with `claude mcp add`) | `mcpServers` |
+| Claude Desktop | `claude_desktop_config.json` — macOS `~/Library/Application Support/Claude/`, Windows `%APPDATA%\Claude\` | `mcpServers` |
+| Cursor | `.cursor/mcp.json` in the project, or `~/.cursor/mcp.json` globally | `mcpServers` |
+| VS Code (agent mode) | `.vscode/mcp.json` | `servers` |
+| Anything else | see that client's MCP documentation | usually `mcpServers` |
+
+Locations move between releases — if one doesn't match what you see, the client's own MCP docs are authoritative. After saving, restart or reload the client so it launches the server, then confirm it appears in the client's MCP server list (in Claude Code, `/mcp`).
 
 Key points:
 - `--path` — absolute path to the WordPress install root
@@ -71,31 +105,29 @@ Pipe newline-delimited JSON-RPC requests via stdin; responses come back on stdou
 
 ```bash
 printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/list-forms","parameters":{}}}}' \
   | wp --path="/path/to/wordpress" mcp-adapter serve --server=formidable-mcp --user=1 2>/dev/null \
-  | tail -1 | jq '.'
+  | grep '^{' | tail -1 | jq '.'
 ```
 
 - Multiple requests can be piped in one command; use `tail -N` to grab the last N responses
-- `2>/dev/null` suppresses PHP deprecation warnings that would corrupt JSON parsing
-- Extract data: `response['result']['content'][0]['text']`, then parse that string as JSON
+- **`grep '^{'` is not optional.** PHP notices and wp-cli's own deprecation warnings interleave with the responses on **stdout** — under PHP's CLI SAPI `display_errors` writes there, so `2>/dev/null` alone does not protect the stream. Verified against wp-cli on PHP 8.5: a `Deprecated: WP_CLI\Runner::get_subcommand_suggestion()...` line arrived between the request and the first response, and any whole-stream `jq` failed on it. Filtering to lines that start with `{` leaves exactly the JSON-RPC responses
+- One JSON object per line, in request order, so `select(.id==N)` picks a specific response out of a batch
+- Extract data: `.result.structuredContent.data`, or parse `.result.content[0].text` as a JSON string
 
 ## Transport 2: HTTP endpoint (curl)
 
 **Endpoint:** `https://your-site.local/wp-json/mcp/formidable-mcp`
 
-**Authentication:** HTTP Basic Auth with a WordPress username and an application password:
+**Authentication:** HTTP Basic Auth with a WordPress username and an application password, supplied by `frm-mcp.env` rather than typed into a command (see "Connecting" above). In the raw curl examples throughout this skill, `-u "USERNAME:APPLICATION_PASSWORD"` is a placeholder showing where the header comes from — run the calls through `scripts/frm-mcp` instead of substituting real values into them.
 
-```
--u "USERNAME:APPLICATION_PASSWORD"
-```
-
-### Creating an application password
+### Creating an application password (site owner, in the browser)
 
 1. WP Admin → **Users → Profile** (of an **administrator** — the ability permission callbacks check real capabilities, so a low-role user's password will get 403s on most abilities)
 2. Scroll to **Application Passwords**, enter a name (e.g. `formidable-mcp`), click **Add New Application Password**
-3. Copy the generated password immediately (shown once). Spaces in it are fine — pass it as-is inside quotes: `-u "admin:xxxx xxxx xxxx xxxx xxxx xxxx"`
+3. Copy the generated password immediately (shown once)
+4. Paste it straight into `skills/formidable-mcp/scripts/frm-mcp.env` (copied from `frm-mcp.env.example`) as `APPLICATION_PASSWORD`, alongside `SITE_URL` and `WP_USERNAME`. Spaces in the password are fine — keep the quotes. Nothing else needs to see this value; it should not be pasted into a chat, a command, or a shell export.
 
 Requirements & hosting gotchas:
 
@@ -104,33 +136,11 @@ Requirements & hosting gotchas:
 - **Some hosts strip the `Authorization` header** before it reaches PHP (common on Apache CGI/FastCGI). Symptom: valid credentials always return `401`/`rest_not_logged_in`. Fix in `.htaccess`: `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1` (or `CGIPassAuth On` on Apache 2.4.13+).
 - The MCP endpoint is served by the Formidable API add-on's MCP adapter — if `/wp-json/mcp/formidable-mcp` 404s, confirm that plugin is active and permalinks aren't set to "Plain".
 
-### Step 1 — Initialize a session
+### Step 1 — Point the helper at the site (once per machine)
 
-```bash
-curl -s -i -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
-  -H "Content-Type: application/json" \
-  -u "USERNAME:APPLICATION_PASSWORD" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "initialize",
-    "params": {
-      "protocolVersion": "2024-11-25",
-      "capabilities": {},
-      "clientInfo": {"name": "claude", "version": "1.0"}
-    },
-    "id": 1
-  }' 2>&1 | grep "mcp-session-id" | cut -d' ' -f2 | tr -d '\r'
-```
+Copy `scripts/frm-mcp.env.example` to `scripts/frm-mcp.env` and fill in `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD`. That is the whole connection setup — see "Connecting" above for why the values belong in the file and nowhere else.
 
-**Critical:** the session ID comes back in the `mcp-session-id` HTTP **response header**, not the JSON body. Extract it and reuse it.
-
-### Step 2 — Include the session header on every subsequent call
-
-```
--H "Mcp-Session-Id: {session-id-from-step-1}"
-```
-
-### Step 3 (recommended) — use the bundled helper script
+### Step 2 — Make calls through the bundled helper
 
 Sessions expire after inactivity, and hand-rolling every curl call is error-prone. **This skill ships a ready-to-use wrapper at `scripts/frm-mcp`** — it caches the session, auto-re-initializes on expiry, normalizes the response envelope, and takes the ability name plus a pretty-printed JSON body (YAML also accepted), so permission prompts stay readable:
 
@@ -139,9 +149,37 @@ Sessions expire after inactivity, and hand-rolling every curl call is error-pron
 ./scripts/frm-mcp formidable-forms/create-entry '{"form_id": "123", "456": "value"}'
 ```
 
-Site URL and credentials come from `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD` env vars, or a `frm-mcp.env` file next to the script (machine-specific — gitignored, never committed). Secrets never appear on the command line, so they never show in permission prompts either. A permissions tip for Claude Code: prefix-based Bash allow rules can permanently allow read-only calls (`frm-mcp formidable-forms/list-*`, `get-*`) while `create-*`/`update-*`/`delete-*` still prompt.
+The helper reads `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD` from `frm-mcp.env` (env vars of the same names override it, which is for CI and scripted use — don't put a real password in a command prefix). Secrets never appear on the command line, so they never show in permission prompts either. If your client gates shell commands behind per-call approval — Claude Code, for example — prefix-based allow rules pair well with this: permanently allow read-only calls (`frm-mcp formidable-forms/list-*`, `get-*`) while `create-*`/`update-*`/`delete-*` keep prompting.
 
-The equivalent inline recipe, if you can't use the bundled file (it is the same logic):
+### Under the hood — the session protocol
+
+The helper handles this for you; you need it only when debugging or when writing your own client.
+
+A session is opened by `initialize`, and **the session ID comes back in the `mcp-session-id` HTTP response header, not the JSON body**:
+
+```bash
+curl -s -i -X POST "$SITE_URL/wp-json/mcp/formidable-mcp" \
+  -H "Content-Type: application/json" \
+  -u "$WP_USERNAME:$APPLICATION_PASSWORD" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {},
+      "clientInfo": {"name": "claude", "version": "1.0"}
+    },
+    "id": 1
+  }' 2>&1 | grep "mcp-session-id" | cut -d' ' -f2 | tr -d '\r'
+```
+
+Every subsequent call carries it as a header:
+
+```
+-H "Mcp-Session-Id: {session-id-from-initialize}"
+```
+
+The equivalent inline recipe, if you can't use the bundled file (it is the same logic). Note that it too takes credentials from the environment rather than embedding them:
 
 ```bash
 #!/bin/bash
@@ -149,15 +187,16 @@ The equivalent inline recipe, if you can't use the bundled file (it is the same 
 # e.g.:    ./mcp.sh formidable-forms/list-forms '{}'
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
-URL="https://your-site.local/wp-json/mcp/formidable-mcp"
-AUTH="USERNAME:APPLICATION_PASSWORD"
+[ -f "$DIR/frm-mcp.env" ] && . "$DIR/frm-mcp.env"   # SITE_URL, WP_USERNAME, APPLICATION_PASSWORD
+URL="${SITE_URL%/}/wp-json/mcp/formidable-mcp"
+AUTH="$WP_USERNAME:$APPLICATION_PASSWORD"
 SESSION_FILE="$DIR/.mcp-session"
 
 init_session() {
   curl -s -i -X POST "$URL" \
     -H "Content-Type: application/json" \
     -u "$AUTH" \
-    -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
+    -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
     2>/dev/null | grep -i "mcp-session-id" | head -1 | cut -d' ' -f2 | tr -d '\r' > "$SESSION_FILE"
 }
 
@@ -195,7 +234,8 @@ The MCP server exposes three generic tools; all Formidable operations go through
 ### 1. `mcp-adapter-discover-abilities`
 Lists all registered WordPress abilities.
 - **Input:** empty object
-- **Output:** array of ability objects with name, label, description
+- **Output:** an object wrapping the list — `{"abilities": [{name, label, description}, …]}` — not a bare array
+- Abilities from **other plugins** appear here too (a site with WP Mail SMTP returns `wp-mail-smtp/get-debug-events` alongside the Formidable ones). Filter on the `formidable-forms/` prefix rather than assuming everything returned belongs to Formidable
 
 ### 2. `mcp-adapter-get-ability-info`
 Get detailed info about one ability, including schemas.
@@ -240,6 +280,8 @@ All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` 
 | Ability | Description | Notes |
 |---|---|---|
 | `list-fields` | List a form's fields (id, field_key, name, type, options); use to map values for create/update-entry | readonly |
+| `create-field` | Add a field to an existing form; same field object as `create-form`'s inline `fields[]` | not idempotent |
+| `update-field` | Update a field's name, options, or settings by field id — no `form_id` needed | not idempotent |
 | `delete-field` | Delete a field by id | destructive |
 | `get-stats` | Field statistics across entries. Types: `total`, `count`, `average`, `median`, `star`, `maximum`, `minimum`, `unique`, `deviation`. `field_id` accepts id, key, or comma-separated list | readonly, idempotent; requires Formidable Pro |
 
@@ -579,7 +621,7 @@ All ability responses follow this pattern:
 ```
 
 - **Extract data from:** `.result.structuredContent.data`
-- Over the stdio bridge, `structuredContent` may be absent; parse `result.content[0].text` as JSON instead
+- Both transports return `structuredContent` on `tools/call` (verified on adapter v1.18 over stdio and HTTP), so the same jq path works on either. It is absent from `initialize` and `tools/list` responses, which carry no ability payload. Keep `// (.result.content[0].text | fromjson?)` as a fallback anyway — `scripts/frm-mcp` does — since the text block is the transport-guaranteed copy
 - On failure, `isError` is `true`; error details are in `result.content[0].text` or `structuredContent.error`
 
 ## Common errors and solutions

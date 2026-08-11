@@ -80,7 +80,7 @@ init_session() {
   curl -s -i ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
     -H "Content-Type: application/json" \
     -u "$AUTH" \
-    -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
+    -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
     2>/dev/null | grep -i "mcp-session-id" | head -1 | cut -d' ' -f2 | tr -d '\r' > "$SESSION_FILE"
 }
 

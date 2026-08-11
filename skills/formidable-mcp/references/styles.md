@@ -40,7 +40,7 @@ Via MCP over the WP-CLI stdio bridge:
 
 ```bash
 cat > /tmp/create_style.jsonl << 'JSON'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-style","parameters":{"name":"My New Style","post_content":{"title_color":"D32F2F","bg_color":"F5DEB3","text_color":"2C2C2C"}}}}}
 JSON
 
@@ -125,7 +125,7 @@ Use MCP; all colors, fonts, and spacing persist correctly:
 
 ```bash
 cat > /tmp/update_style.jsonl << 'JSON'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/update-style","parameters":{"id":"10400","post_content":{"text_color":"000000","submit_bg_color":"FF0000","border_color":"CCCCCC"}}}}}
 JSON
 
@@ -323,7 +323,7 @@ Successfully tested via MCP — all colors persist:
 
 ```bash
 cat > /tmp/dark_theme.jsonl << 'JSON'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/update-style","parameters":{"id":"10400","post_content":{"bg_color":"1a1a1a","text_color":"FFD700","title_color":"FFD700","form_desc_color":"FFC107","label_color":"FFD700","border_color":"FF6B35","fieldset_bg_color":"2d2d2d","section_color":"FFC107","submit_bg_color":"FF6B35","submit_text_color":"1a1a1a","submit_hover_bg_color":"FFD700"}}}}}
 JSON
 

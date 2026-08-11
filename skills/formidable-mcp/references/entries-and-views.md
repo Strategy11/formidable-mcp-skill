@@ -4,12 +4,12 @@ Read this when: querying or managing form submissions (entries), creating or fix
 
 ## MCP Session Setup
 
-All examples below use the Formidable MCP HTTP endpoint. Initialize a session once, then reuse the session ID. Replace `https://your-site.local` with your site URL and `admin:APP_PASSWORD` with your WordPress username and application password.
+All examples below use the Formidable MCP HTTP endpoint. Initialize a session once, then reuse the session ID. `https://your-site.local` and `admin:APP_PASSWORD` are placeholders showing the request shape — rather than substituting real values into these commands, run them through `scripts/frm-mcp`, which supplies both from `frm-mcp.env` and manages the session for you (see `mcp-protocol.md` § "Connecting", and `getting-started.md` if the site isn't connected yet).
 
 ```bash
 SESSION=$(curl -s -i -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
   -u "admin:APP_PASSWORD" \
-  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
   2>&1 | grep -i "mcp-session-id" | cut -d' ' -f2 | tr -d '\r')
 ```
 

@@ -37,7 +37,7 @@ The examples in this file use the WP-CLI stdio bridge, but the same `arguments` 
 
 ```bash
 cat > /tmp/action.jsonl << 'JSON'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"1429","type":"email","post_content":{"email_to":"[default-email]","email_message":"Test","event":["create"]}}}}}
 JSON
 
@@ -74,7 +74,7 @@ Add a `conditions` object inside `post_content`. Verified end-to-end with a `wpp
 
 ```bash
 cat > /tmp/create_email_action.jsonl << 'JSON'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"1429","type":"email","post_content":{"email_to":"[default-email]","email_message":"Your message here","event":["create"]}}}}}
 JSON
 
@@ -117,7 +117,7 @@ For the complete catalog — `[default-message]` parameters, conditionals (`[if 
 
 ```bash
 cat > /tmp/create_confirmation_action.jsonl << 'JSON'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"1429","type":"confirmation","post_content":{"success_action":"message","success_msg":"Your message here","event":["create"]}}}}}
 JSON
 
@@ -225,7 +225,7 @@ List all actions for a specific form:
 
 ```bash
 cat > /tmp/list_actions.jsonl << 'JSON'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/list-form-actions","parameters":{"form_id":"1429"}}}}
 JSON
 
@@ -238,7 +238,7 @@ Get a specific action by ID:
 
 ```bash
 cat > /tmp/get_action.jsonl << 'JSON'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/get-form-action","parameters":{"id":"10435"}}}}
 JSON
 
@@ -251,7 +251,7 @@ To change an action, use `update-form-action` with `id` and a partial `post_cont
 
 ```bash
 cat > /tmp/delete_action.jsonl << 'JSON'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/delete-form-action","parameters":{"id":"10435"}}}}
 JSON
 
@@ -374,14 +374,14 @@ FORM_ID=1429
 
 # Create email action
 EMAIL_ID=$(cat > /tmp/email.jsonl << 'JSON'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"$FORM_ID","type":"email","post_content":{"email_to":"[default-email]","email_message":"Test email","event":["create"]}}}}}
 JSON
 cat /tmp/email.jsonl | wp --path="/path/to/site" mcp-adapter serve --server=formidable-mcp --user=1 2>/dev/null | tail -1 | jq -r '.result.structuredContent.data.id')
 
 # Create confirmation action
 CONFIRM_ID=$(cat > /tmp/confirm.jsonl << 'JSON'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"$FORM_ID","type":"confirmation","post_content":{"success_action":"message","success_msg":"Thanks for submitting!","event":["create"]}}}}}
 JSON
 cat /tmp/confirm.jsonl | wp --path="/path/to/site" mcp-adapter serve --server=formidable-mcp --user=1 2>/dev/null | tail -1 | jq -r '.result.structuredContent.data.id')
