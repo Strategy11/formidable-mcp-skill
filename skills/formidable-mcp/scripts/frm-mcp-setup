@@ -1,0 +1,205 @@
+#!/bin/bash
+# frm-mcp-setup — check that this machine can talk to a site's Formidable MCP
+# adapter, and say exactly what to do next when it can't.
+#
+# Usage:
+#   ./frm-mcp-setup
+#
+# It is safe to run repeatedly and it changes nothing except creating
+# frm-mcp.env from the example template when that file is missing. It never
+# asks for a password, never prints credential values, and never sends
+# anything anywhere except the site you configured.
+#
+# Exit code 0 means the connection works and you can start making calls.
+set -uo pipefail
+DIR="$(cd "$(dirname "$0")" && pwd)"
+ENV_FILE="$DIR/frm-mcp.env"
+EXAMPLE_FILE="$DIR/frm-mcp.env.example"
+
+if [ -t 1 ]; then
+  OK=$'\033[32m✓\033[0m'; BAD=$'\033[31m✗\033[0m'; WARN=$'\033[33m!\033[0m'; B=$'\033[1m'; N=$'\033[0m'
+else
+  OK="[ok]"; BAD="[fail]"; WARN="[warn]"; B=""; N=""
+fi
+
+step() { printf '\n%s%s%s\n' "$B" "$1" "$N"; }
+pass() { printf '  %s %s\n' "$OK" "$1"; }
+warn() { printf '  %s %s\n' "$WARN" "$1"; }
+fail() { printf '  %s %s\n' "$BAD" "$1"; }
+next() { printf '\n%sNext:%s %s\n' "$B" "$N" "$1"; }
+
+printf '%sFormidable MCP — connection check%s\n' "$B" "$N"
+
+# ---------------------------------------------------------------- 1. tooling
+step "1. Local tools"
+missing=""
+for tool in curl jq; do
+  if command -v "$tool" >/dev/null 2>&1; then
+    pass "$tool found"
+  else
+    fail "$tool not found"
+    missing="$missing $tool"
+  fi
+done
+if [ -n "$missing" ]; then
+  next "install the missing tool(s):  brew install$missing   (macOS)  |  apt install$missing   (Debian/Ubuntu)"
+  exit 1
+fi
+
+# ------------------------------------------------------------- 2. env file
+step "2. Configuration file (frm-mcp.env)"
+if [ ! -f "$ENV_FILE" ]; then
+  if [ -f "$EXAMPLE_FILE" ]; then
+    cp "$EXAMPLE_FILE" "$ENV_FILE"
+    warn "created $ENV_FILE from the example template"
+  else
+    fail "no $ENV_FILE and no example template to copy"
+    next "create $ENV_FILE with SITE_URL, WP_USERNAME and APPLICATION_PASSWORD."
+    exit 1
+  fi
+else
+  pass "$ENV_FILE exists"
+fi
+
+# Read the file in a subshell-safe way; values are used, never printed.
+SITE_URL=""; WP_USERNAME=""; APPLICATION_PASSWORD=""
+# shellcheck source=/dev/null
+. "$ENV_FILE"
+
+placeholder=""
+case "${SITE_URL:-}" in ""|*your-site.local*) placeholder="yes" ;; esac
+case "${WP_USERNAME:-}" in "") placeholder="yes" ;; esac
+case "${APPLICATION_PASSWORD:-}" in ""|xxxx*) placeholder="yes" ;; esac
+
+if [ -n "$placeholder" ]; then
+  fail "still holds template placeholders"
+  cat <<EOF
+
+  Fill it in yourself — no one else needs these values, and an AI assistant
+  should never ask you to paste them into a chat:
+
+    1. Open $ENV_FILE in your editor.
+    2. SITE_URL        — your site, e.g. https://example.com (no trailing slash needed)
+    3. WP_USERNAME     — the WordPress username of an administrator
+    4. APPLICATION_PASSWORD — WP Admin -> Users -> Profile -> Application Passwords ->
+                         name it "formidable-mcp" -> Add New. Copy the generated
+                         password (shown once) and paste it here. Spaces are fine.
+                         This is NOT the account login password.
+
+  Then run this script again.
+EOF
+  exit 1
+fi
+pass "SITE_URL, WP_USERNAME and APPLICATION_PASSWORD are set"
+
+# --------------------------------------------------------------- 3. endpoint
+URL="${SITE_URL%/}/wp-json/mcp/formidable-mcp"
+TLS_OPTS=()
+if [ -n "${FRM_MCP_CACERT:-}" ]; then
+  TLS_OPTS+=(--cacert "$FRM_MCP_CACERT")
+elif [ "${FRM_MCP_INSECURE:-0}" = "1" ]; then
+  case "$URL" in
+    https://*.local/*|https://*.test/*|https://localhost*|https://127.0.0.1*) TLS_OPTS+=(-k) ;;
+  esac
+fi
+curl_opts=(-s -o /dev/null -w '%{http_code}' --max-time 20 ${TLS_OPTS[@]+"${TLS_OPTS[@]}"})
+
+step "3. Reaching the site"
+tls_err=$(curl -sS -o /dev/null --max-time 20 ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} "${SITE_URL%/}/" 2>&1)
+tls_rc=$?
+if [ "$tls_rc" = "60" ] || [ "$tls_rc" = "77" ]; then
+  fail "TLS certificate not trusted"
+  cat <<EOF
+
+  Local dev environments use self-signed certificates. Trust the environment's CA:
+    Local by Flywheel -> "Trust" button beside the site's SSL certificate
+    Laravel Valet     -> valet trust
+    DDEV              -> mkcert -install
+  Or point at the CA file by adding FRM_MCP_CACERT="/path/to/ca.pem" to frm-mcp.env.
+EOF
+  exit 1
+fi
+if [ "$tls_rc" != "0" ]; then
+  fail "could not connect to ${SITE_URL%/} (curl exit $tls_rc)"
+  [ -n "$tls_err" ] && printf '    %s\n' "$tls_err"
+  next "check SITE_URL in $ENV_FILE — it should be the site's real, reachable URL."
+  exit 1
+fi
+pass "site responds"
+
+anon=$(curl "${curl_opts[@]}" -X POST "$URL" -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"setup","version":"1.0"}},"id":1}' 2>/dev/null)
+if [ "$anon" = "404" ]; then
+  fail "no MCP endpoint at $URL (404)"
+  cat <<EOF
+
+  Either the Formidable API add-on (which ships the MCP adapter) is not active,
+  or permalinks are set to "Plain":
+    WP Admin -> Plugins            -> activate "Formidable Forms API"
+    WP Admin -> Settings -> Permalinks -> any structure other than Plain
+EOF
+  exit 1
+fi
+pass "MCP endpoint found (/wp-json/mcp/formidable-mcp)"
+
+# ------------------------------------------------------------------- 4. auth
+step "4. Authenticating"
+headers=$(curl -s -i --max-time 20 ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
+  -H 'Content-Type: application/json' \
+  -u "$WP_USERNAME:$APPLICATION_PASSWORD" \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"setup","version":"1.0"}},"id":1}' 2>/dev/null)
+
+if printf '%s' "$headers" | grep -qi 'rest_not_logged_in\|"status":401\|HTTP/[0-9.]* 401'; then
+  fail "the site rejected the credentials (401)"
+  cat <<EOF
+
+  Most likely, in order:
+    1. The application password was mistyped or has been revoked — generate a
+       fresh one (WP Admin -> Users -> Profile -> Application Passwords) and paste
+       it into $ENV_FILE. Do not paste it into a chat.
+    2. WP_USERNAME is not the *username* (it is not the display name or email).
+    3. The user is not an administrator — most abilities check real capabilities.
+    4. The host strips the Authorization header (common on Apache CGI/FastCGI).
+       Add to .htaccess:  SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=\$1
+EOF
+  exit 1
+fi
+
+SESSION=$(printf '%s' "$headers" | grep -i '^mcp-session-id' | head -1 | cut -d' ' -f2 | tr -d '\r')
+if [ -z "$SESSION" ]; then
+  fail "no mcp-session-id header came back"
+  printf '%s\n' "$headers" | head -20
+  next "see references/mcp-protocol.md § Common errors and solutions."
+  exit 1
+fi
+pass "authenticated as $WP_USERNAME (session opened)"
+
+# -------------------------------------------------------------- 5. abilities
+step "5. Formidable abilities"
+forms=$(curl -s --max-time 30 ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
+  -H 'Content-Type: application/json' -H "Mcp-Session-Id: $SESSION" \
+  -u "$WP_USERNAME:$APPLICATION_PASSWORD" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/list-forms","parameters":{}}},"id":2}' 2>/dev/null)
+
+count=$(printf '%s' "$forms" | jq -r '(.result.structuredContent.data // (.result.content[0].text | fromjson?).data // empty) | length' 2>/dev/null)
+if [ -z "$count" ]; then
+  fail "list-forms did not return form data"
+  printf '%s' "$forms" | jq '.' 2>/dev/null | head -20 || printf '%s\n' "$forms" | head -5
+  next "see references/gotchas.md and references/mcp-protocol.md § Common errors and solutions."
+  exit 1
+fi
+pass "list-forms works — $count form(s) on the site"
+
+views=$(curl -s --max-time 30 ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
+  -H 'Content-Type: application/json' -H "Mcp-Session-Id: $SESSION" \
+  -u "$WP_USERNAME:$APPLICATION_PASSWORD" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/list-views","parameters":{}}},"id":3}' 2>/dev/null)
+if printf '%s' "$views" | grep -qi 'not found\|does not exist\|isError":true'; then
+  warn "views abilities unavailable — Formidable Views is not active (Pro feature; forms and entries still work)"
+else
+  pass "views abilities available"
+fi
+
+# ------------------------------------------------------------------- done
+printf '\n%sConnected.%s Try a call:\n\n  %s/frm-mcp formidable-forms/list-forms\n\n' "$B" "$N" "$DIR"
+printf 'Or just ask your AI assistant for Formidable work in plain language — the\nskill routes itself. See references/getting-started.md for a first task to try.\n'

@@ -27,6 +27,26 @@ Read this when: you need to connect to, configure, or call the Formidable Forms 
 - **Session management (HTTP):** header-based (`mcp-session-id`); sessions expire after inactivity
 - **Abilities:** registered via the WordPress Abilities API, namespaced `formidable-forms/<action>`, each marked `mcp.public => true` and `show_in_rest => true`
 
+## Connecting: credentials go in a file, never in the chat
+
+Before the first call, the site URL and credentials must be somewhere the tooling can read them. **The recommended setup is a `frm-mcp.env` file next to `scripts/frm-mcp`**, created by the site owner in an editor:
+
+```bash
+cd skills/formidable-mcp/scripts
+cp frm-mcp.env.example frm-mcp.env
+# then edit frm-mcp.env and fill in SITE_URL, WP_USERNAME, APPLICATION_PASSWORD
+```
+
+The file is gitignored, so credentials stay out of version control, off the command line, and out of permission prompts — the helper reads them at call time instead.
+
+**Never ask the user to paste credentials into the conversation, and never type them into a command.** An application password sent to an AI assistant is in the transcript, in the model provider's logs, and potentially in a permission prompt or shell history — it must be rotated afterward, so treat pasted credentials as burned. This applies to every route to the same secret:
+
+- **Do:** tell the user to run the `cp` above and fill in the file themselves; then just call `frm-mcp` and let it pick the values up. If a call fails on auth, report the failure and ask them to re-check the file — do not offer to take the password "just this once".
+- **Don't:** ask "what's your application password?"; don't offer to write `frm-mcp.env` for them from values they supply in chat; don't put credentials in an inline `-u "user:password"` curl command, a `SITE_URL=… APPLICATION_PASSWORD=… frm-mcp …` prefix, or an `export` the user is told to run; don't echo, `cat`, or otherwise read the contents of `frm-mcp.env` back — checking that the file exists is enough.
+- If the user pastes a credential anyway, don't repeat it in your replies, and tell them plainly that it should be revoked and regenerated in WP Admin once the file is set up.
+
+The same rule covers the WP-CLI transport: it needs no password at all, so if the user has shell access to the WordPress host, prefer it.
+
 ## Choosing a transport
 
 | Transport | Use when | Needs |
@@ -85,17 +105,14 @@ printf '%s\n' \
 
 **Endpoint:** `https://your-site.local/wp-json/mcp/formidable-mcp`
 
-**Authentication:** HTTP Basic Auth with a WordPress username and an application password:
+**Authentication:** HTTP Basic Auth with a WordPress username and an application password, supplied by `frm-mcp.env` rather than typed into a command (see "Connecting" above). In the raw curl examples throughout this skill, `-u "USERNAME:APPLICATION_PASSWORD"` is a placeholder showing where the header comes from — run the calls through `scripts/frm-mcp` instead of substituting real values into them.
 
-```
--u "USERNAME:APPLICATION_PASSWORD"
-```
-
-### Creating an application password
+### Creating an application password (site owner, in the browser)
 
 1. WP Admin → **Users → Profile** (of an **administrator** — the ability permission callbacks check real capabilities, so a low-role user's password will get 403s on most abilities)
 2. Scroll to **Application Passwords**, enter a name (e.g. `formidable-mcp`), click **Add New Application Password**
-3. Copy the generated password immediately (shown once). Spaces in it are fine — pass it as-is inside quotes: `-u "admin:xxxx xxxx xxxx xxxx xxxx xxxx"`
+3. Copy the generated password immediately (shown once)
+4. Paste it straight into `skills/formidable-mcp/scripts/frm-mcp.env` (copied from `frm-mcp.env.example`) as `APPLICATION_PASSWORD`, alongside `SITE_URL` and `WP_USERNAME`. Spaces in the password are fine — keep the quotes. Nothing else needs to see this value; it should not be pasted into a chat, a command, or a shell export.
 
 Requirements & hosting gotchas:
 
@@ -104,12 +121,31 @@ Requirements & hosting gotchas:
 - **Some hosts strip the `Authorization` header** before it reaches PHP (common on Apache CGI/FastCGI). Symptom: valid credentials always return `401`/`rest_not_logged_in`. Fix in `.htaccess`: `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1` (or `CGIPassAuth On` on Apache 2.4.13+).
 - The MCP endpoint is served by the Formidable API add-on's MCP adapter — if `/wp-json/mcp/formidable-mcp` 404s, confirm that plugin is active and permalinks aren't set to "Plain".
 
-### Step 1 — Initialize a session
+### Step 1 — Point the helper at the site (once per machine)
+
+Copy `scripts/frm-mcp.env.example` to `scripts/frm-mcp.env` and fill in `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD`. That is the whole connection setup — see "Connecting" above for why the values belong in the file and nowhere else.
+
+### Step 2 — Make calls through the bundled helper
+
+Sessions expire after inactivity, and hand-rolling every curl call is error-prone. **This skill ships a ready-to-use wrapper at `scripts/frm-mcp`** — it caches the session, auto-re-initializes on expiry, normalizes the response envelope, and takes the ability name plus a pretty-printed JSON body (YAML also accepted), so permission prompts stay readable:
 
 ```bash
-curl -s -i -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
+./scripts/frm-mcp formidable-forms/list-forms
+./scripts/frm-mcp formidable-forms/create-entry '{"form_id": "123", "456": "value"}'
+```
+
+The helper reads `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD` from `frm-mcp.env` (env vars of the same names override it, which is for CI and scripted use — don't put a real password in a command prefix). Secrets never appear on the command line, so they never show in permission prompts either. A permissions tip for Claude Code: prefix-based Bash allow rules can permanently allow read-only calls (`frm-mcp formidable-forms/list-*`, `get-*`) while `create-*`/`update-*`/`delete-*` still prompt.
+
+### Under the hood — the session protocol
+
+The helper handles this for you; you need it only when debugging or when writing your own client.
+
+A session is opened by `initialize`, and **the session ID comes back in the `mcp-session-id` HTTP response header, not the JSON body**:
+
+```bash
+curl -s -i -X POST "$SITE_URL/wp-json/mcp/formidable-mcp" \
   -H "Content-Type: application/json" \
-  -u "USERNAME:APPLICATION_PASSWORD" \
+  -u "$WP_USERNAME:$APPLICATION_PASSWORD" \
   -d '{
     "jsonrpc": "2.0",
     "method": "initialize",
@@ -122,26 +158,13 @@ curl -s -i -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
   }' 2>&1 | grep "mcp-session-id" | cut -d' ' -f2 | tr -d '\r'
 ```
 
-**Critical:** the session ID comes back in the `mcp-session-id` HTTP **response header**, not the JSON body. Extract it and reuse it.
-
-### Step 2 — Include the session header on every subsequent call
+Every subsequent call carries it as a header:
 
 ```
--H "Mcp-Session-Id: {session-id-from-step-1}"
+-H "Mcp-Session-Id: {session-id-from-initialize}"
 ```
 
-### Step 3 (recommended) — use the bundled helper script
-
-Sessions expire after inactivity, and hand-rolling every curl call is error-prone. **This skill ships a ready-to-use wrapper at `scripts/frm-mcp`** — it caches the session, auto-re-initializes on expiry, normalizes the response envelope, and takes the ability name plus a pretty-printed JSON body (YAML also accepted), so permission prompts stay readable:
-
-```bash
-./scripts/frm-mcp formidable-forms/list-forms
-./scripts/frm-mcp formidable-forms/create-entry '{"form_id": "123", "456": "value"}'
-```
-
-Site URL and credentials come from `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD` env vars, or a `frm-mcp.env` file next to the script (machine-specific — gitignored, never committed). Secrets never appear on the command line, so they never show in permission prompts either. A permissions tip for Claude Code: prefix-based Bash allow rules can permanently allow read-only calls (`frm-mcp formidable-forms/list-*`, `get-*`) while `create-*`/`update-*`/`delete-*` still prompt.
-
-The equivalent inline recipe, if you can't use the bundled file (it is the same logic):
+The equivalent inline recipe, if you can't use the bundled file (it is the same logic). Note that it too takes credentials from the environment rather than embedding them:
 
 ```bash
 #!/bin/bash
@@ -149,8 +172,9 @@ The equivalent inline recipe, if you can't use the bundled file (it is the same 
 # e.g.:    ./mcp.sh formidable-forms/list-forms '{}'
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
-URL="https://your-site.local/wp-json/mcp/formidable-mcp"
-AUTH="USERNAME:APPLICATION_PASSWORD"
+[ -f "$DIR/frm-mcp.env" ] && . "$DIR/frm-mcp.env"   # SITE_URL, WP_USERNAME, APPLICATION_PASSWORD
+URL="${SITE_URL%/}/wp-json/mcp/formidable-mcp"
+AUTH="$WP_USERNAME:$APPLICATION_PASSWORD"
 SESSION_FILE="$DIR/.mcp-session"
 
 init_session() {

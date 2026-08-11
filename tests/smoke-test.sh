@@ -4,9 +4,13 @@
 # and deletes them (also on abort).
 #
 # Usage:
-#   FRM_MCP_URL="https://your-site.local/wp-json/mcp/formidable-mcp" \
-#   FRM_MCP_AUTH="username:application password" \
 #   ./smoke-test.sh
+#
+# Configuration comes from the skill's scripts/frm-mcp.env (SITE_URL,
+# WP_USERNAME, APPLICATION_PASSWORD) — the same file the frm-mcp helper reads,
+# so credentials stay out of the command line and shell history. FRM_MCP_URL and
+# FRM_MCP_AUTH still override it for CI, where the values come from a secret
+# store rather than being typed.
 #
 # Run this against a DEVELOPMENT site — it creates and deletes real objects.
 #
@@ -17,8 +21,21 @@
 # Requires: curl, jq. Exit code 0 = all pass.
 
 set -u
-: "${FRM_MCP_URL:?Set FRM_MCP_URL to the MCP endpoint}"
-: "${FRM_MCP_AUTH:?Set FRM_MCP_AUTH to user:app-password}"
+
+# Fall back to the skill's local config file when the env vars aren't set.
+ENV_FILE="$(cd "$(dirname "$0")" && pwd)/../skills/formidable-mcp/scripts/frm-mcp.env"
+if [ -z "${FRM_MCP_URL:-}" ] || [ -z "${FRM_MCP_AUTH:-}" ]; then
+  if [ -f "$ENV_FILE" ]; then
+    SITE_URL=""; WP_USERNAME=""; APPLICATION_PASSWORD=""
+    # shellcheck source=/dev/null
+    . "$ENV_FILE"
+    [ -n "$SITE_URL" ] && FRM_MCP_URL="${FRM_MCP_URL:-${SITE_URL%/}/wp-json/mcp/formidable-mcp}"
+    [ -n "$WP_USERNAME" ] && FRM_MCP_AUTH="${FRM_MCP_AUTH:-$WP_USERNAME:$APPLICATION_PASSWORD}"
+  fi
+fi
+
+: "${FRM_MCP_URL:?Set SITE_URL in skills/formidable-mcp/scripts/frm-mcp.env (or FRM_MCP_URL)}"
+: "${FRM_MCP_AUTH:?Set WP_USERNAME + APPLICATION_PASSWORD in frm-mcp.env (or FRM_MCP_AUTH)}"
 
 # TLS options for every curl below. Expanded with the ${arr[@]+...} guard because
 # bash 3.2 (stock on macOS) errors on a bare "${arr[@]}" for an empty array under `set -u`.

@@ -5,7 +5,13 @@ description: Create, query, and manage everything in Formidable Forms via MCP �
 
 ## Overview
 
-This skill covers all Formidable Forms work through the Formidable MCP adapter. It is self-contained and portable: everything needed to do the work correctly is in this file and the `references/` directory. Site-specific access details (credentials, URLs, local paths) intentionally live outside this skill — supply them via environment variables or your own project configuration, so the skill stays portable across sites. See `references/mcp-protocol.md` for setup.
+This skill covers all Formidable Forms work through the Formidable MCP adapter. It is self-contained and portable: everything needed to do the work correctly is in this file and the `references/` directory. Site-specific access details (credentials, URLs, local paths) intentionally live outside this skill — they belong in a local `scripts/frm-mcp.env` file, so the skill stays portable across sites.
+
+## Not connected yet? Start here
+
+If the site has never been connected from this machine — no `scripts/frm-mcp.env`, no working MCP tool, or the first call fails on auth — **read `references/getting-started.md` and walk the user through it.** It is a four-step setup with the exact commands to run, and `scripts/frm-mcp-setup` diagnoses each step automatically.
+
+**Never ask the user for credentials.** Not in chat, not as a command to run, not "just paste it and I'll write the file". The application password goes from WP Admin straight into `frm-mcp.env`, typed by the user in an editor; you only ever confirm the file exists and run calls that read it. A password pasted into a conversation is in the transcript and must be rotated — so don't create that situation. Full reasoning in `references/mcp-protocol.md` § "Connecting".
 
 ## Routing: which reference to read
 
@@ -13,6 +19,7 @@ Read the reference file(s) for the task at hand BEFORE making MCP calls. Do not 
 
 | Task | Read |
 |---|---|
+| **First-time setup / "how do I connect this?" / auth failures on the first call** | `references/getting-started.md` |
 | Create/edit forms, add fields, field types & options, form settings | `references/forms-and-fields.md` |
 | Repeaters (repeatable sections) or nested/embedded forms | `references/repeaters.md` — **always**, this is the most error-prone area |
 | Entries (submissions), views, field statistics | `references/entries-and-views.md` |
