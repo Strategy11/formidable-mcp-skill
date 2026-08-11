@@ -9,7 +9,7 @@ All examples below use the Formidable MCP HTTP endpoint. Initialize a session on
 ```bash
 SESSION=$(curl -s -i -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
   -u "admin:APP_PASSWORD" \
-  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
   2>&1 | grep -i "mcp-session-id" | cut -d' ' -f2 | tr -d '\r')
 ```
 

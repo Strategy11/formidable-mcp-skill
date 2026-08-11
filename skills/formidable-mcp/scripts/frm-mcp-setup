@@ -10,6 +10,13 @@
 # asks for a password, never prints credential values, and never sends
 # anything anywhere except the site you configured.
 #
+# Its output is meant to be shareable — pasted into a chat or an issue. What it
+# can contain: the site URL, the WordPress username, the path to frm-mcp.env,
+# and on failure up to 20 lines of the site's own HTTP response. What it never
+# contains: APPLICATION_PASSWORD, in any encoding. The failure dumps come from
+# `curl -i`, which prints the response only, so the request's Authorization
+# header is not among them.
+#
 # Exit code 0 means the connection works and you can start making calls.
 set -uo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -128,7 +135,7 @@ fi
 pass "site responds"
 
 anon=$(curl "${curl_opts[@]}" -X POST "$URL" -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"setup","version":"1.0"}},"id":1}' 2>/dev/null)
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"setup","version":"1.0"}},"id":1}' 2>/dev/null)
 if [ "$anon" = "404" ]; then
   fail "no MCP endpoint at $URL (404)"
   cat <<EOF
@@ -147,7 +154,7 @@ step "4. Authenticating"
 headers=$(curl -s -i --max-time 20 ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
   -H 'Content-Type: application/json' \
   -u "$WP_USERNAME:$APPLICATION_PASSWORD" \
-  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"setup","version":"1.0"}},"id":1}' 2>/dev/null)
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"setup","version":"1.0"}},"id":1}' 2>/dev/null)
 
 if printf '%s' "$headers" | grep -qi 'rest_not_logged_in\|"status":401\|HTTP/[0-9.]* 401'; then
   fail "the site rejected the credentials (401)"

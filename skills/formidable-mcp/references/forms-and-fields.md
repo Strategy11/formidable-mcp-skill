@@ -16,7 +16,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
     "jsonrpc": "2.0",
     "method": "initialize",
     "params": {
-      "protocolVersion": "2024-11-25",
+      "protocolVersion": "2025-11-25",
       "capabilities": {},
       "clientInfo": {"name": "claude", "version": "1.0"}
     },

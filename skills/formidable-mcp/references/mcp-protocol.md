@@ -21,7 +21,7 @@ Read this when: you need to connect to, configure, or call the Formidable Forms 
 ## Protocol overview
 
 - **Protocol:** MCP over JSON-RPC 2.0
-- **Protocol version:** `2024-11-25`
+- **Protocol version:** `2025-11-25` — what the adapter reports from `initialize` (`serverInfo` there also names the build, e.g. `Formidable MCP Server v1.18`). It answers with its own version regardless of what the client sends, so a stale value in a client's request is tolerated rather than rejected
 - **Transports:** HTTP POST (REST-routed MCP endpoint) or stdio via WP-CLI
 - **Content-Type:** `application/json`
 - **Session management (HTTP):** header-based (`mcp-session-id`); sessions expire after inactivity
@@ -105,15 +105,16 @@ Pipe newline-delimited JSON-RPC requests via stdin; responses come back on stdou
 
 ```bash
 printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/list-forms","parameters":{}}}}' \
   | wp --path="/path/to/wordpress" mcp-adapter serve --server=formidable-mcp --user=1 2>/dev/null \
-  | tail -1 | jq '.'
+  | grep '^{' | tail -1 | jq '.'
 ```
 
 - Multiple requests can be piped in one command; use `tail -N` to grab the last N responses
-- `2>/dev/null` suppresses PHP deprecation warnings that would corrupt JSON parsing
-- Extract data: `response['result']['content'][0]['text']`, then parse that string as JSON
+- **`grep '^{'` is not optional.** PHP notices and wp-cli's own deprecation warnings interleave with the responses on **stdout** — under PHP's CLI SAPI `display_errors` writes there, so `2>/dev/null` alone does not protect the stream. Verified against wp-cli on PHP 8.5: a `Deprecated: WP_CLI\Runner::get_subcommand_suggestion()...` line arrived between the request and the first response, and any whole-stream `jq` failed on it. Filtering to lines that start with `{` leaves exactly the JSON-RPC responses
+- One JSON object per line, in request order, so `select(.id==N)` picks a specific response out of a batch
+- Extract data: `.result.structuredContent.data`, or parse `.result.content[0].text` as a JSON string
 
 ## Transport 2: HTTP endpoint (curl)
 
@@ -164,7 +165,7 @@ curl -s -i -X POST "$SITE_URL/wp-json/mcp/formidable-mcp" \
     "jsonrpc": "2.0",
     "method": "initialize",
     "params": {
-      "protocolVersion": "2024-11-25",
+      "protocolVersion": "2025-11-25",
       "capabilities": {},
       "clientInfo": {"name": "claude", "version": "1.0"}
     },
@@ -195,7 +196,7 @@ init_session() {
   curl -s -i -X POST "$URL" \
     -H "Content-Type: application/json" \
     -u "$AUTH" \
-    -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
+    -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
     2>/dev/null | grep -i "mcp-session-id" | head -1 | cut -d' ' -f2 | tr -d '\r' > "$SESSION_FILE"
 }
 
@@ -233,7 +234,8 @@ The MCP server exposes three generic tools; all Formidable operations go through
 ### 1. `mcp-adapter-discover-abilities`
 Lists all registered WordPress abilities.
 - **Input:** empty object
-- **Output:** array of ability objects with name, label, description
+- **Output:** an object wrapping the list — `{"abilities": [{name, label, description}, …]}` — not a bare array
+- Abilities from **other plugins** appear here too (a site with WP Mail SMTP returns `wp-mail-smtp/get-debug-events` alongside the Formidable ones). Filter on the `formidable-forms/` prefix rather than assuming everything returned belongs to Formidable
 
 ### 2. `mcp-adapter-get-ability-info`
 Get detailed info about one ability, including schemas.
@@ -278,6 +280,8 @@ All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` 
 | Ability | Description | Notes |
 |---|---|---|
 | `list-fields` | List a form's fields (id, field_key, name, type, options); use to map values for create/update-entry | readonly |
+| `create-field` | Add a field to an existing form; same field object as `create-form`'s inline `fields[]` | not idempotent |
+| `update-field` | Update a field's name, options, or settings by field id — no `form_id` needed | not idempotent |
 | `delete-field` | Delete a field by id | destructive |
 | `get-stats` | Field statistics across entries. Types: `total`, `count`, `average`, `median`, `star`, `maximum`, `minimum`, `unique`, `deviation`. `field_id` accepts id, key, or comma-separated list | readonly, idempotent; requires Formidable Pro |
 
@@ -617,7 +621,7 @@ All ability responses follow this pattern:
 ```
 
 - **Extract data from:** `.result.structuredContent.data`
-- Over the stdio bridge, `structuredContent` may be absent; parse `result.content[0].text` as JSON instead
+- Both transports return `structuredContent` on `tools/call` (verified on adapter v1.18 over stdio and HTTP), so the same jq path works on either. It is absent from `initialize` and `tools/list` responses, which carry no ability payload. Keep `// (.result.content[0].text | fromjson?)` as a fallback anyway — `scripts/frm-mcp` does — since the text block is the transport-guaranteed copy
 - On failure, `isError` is `true`; error details are in `result.content[0].text` or `structuredContent.error`
 
 ## Common errors and solutions

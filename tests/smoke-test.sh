@@ -57,7 +57,7 @@ PASS=0; FAIL=0; FAILED_NAMES=()
 FORM_ID=""; CHILD_ID=""; VIEW_ID=""; STYLE_ID=""; ACTION_ID=""; APP_ID=""; ENTRY_ID=""
 
 SESSION=$(curl -s -i -X POST "$FRM_MCP_URL" -u "$FRM_MCP_AUTH" -H 'Content-Type: application/json' \
-  --data-binary '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-25","capabilities":{},"clientInfo":{"name":"smoke-test","version":"1.0"}},"id":1}' \
+  --data-binary '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"smoke-test","version":"1.0"}},"id":1}' \
   ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} 2>&1 | grep -i "mcp-session-id" | cut -d' ' -f2 | tr -d '\r')
 [ -n "$SESSION" ] || { echo "FATAL: could not initialize MCP session"; exit 2; }
 

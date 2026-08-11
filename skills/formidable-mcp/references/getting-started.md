@@ -138,6 +138,8 @@ A message that gets someone unstuck, adaptable verbatim:
 > 2. In a terminal: `cd <scripts dir> && cp frm-mcp.env.example frm-mcp.env`, then open `frm-mcp.env` in your editor and fill in `SITE_URL`, `WP_USERNAME`, and the password you just copied. Don't paste it here — anything in this chat is in the transcript, and I don't need to see it.
 > 3. Run `./frm-mcp-setup` and paste me the output. It never prints your password, and it tells us exactly what's left to fix.
 
+The output is safe to share by design: it can name the site URL, the WordPress username, the config file path, and — only on failure — up to 20 lines of the site's own HTTP response. The application password appears in none of them, in any encoding.
+
 If the user pastes a credential anyway: don't repeat it back, and tell them to revoke that application password in WP Admin and generate a fresh one for the file. Revoking is one click on the same screen that created it.
 
 ## Troubleshooting the first connection
