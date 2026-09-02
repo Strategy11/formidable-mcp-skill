@@ -10,6 +10,19 @@ When a new failure appears, record it here (symptom → cause → status) and pr
 
 ## Standing Cautions
 
+### Conditional logic
+
+- **The builder's condition dropdown is populated only with fields from the form being edited.**
+  Cross-form conditional logic therefore renders correctly **only in the parent/child shape**
+  (a repeater or embedded child form referencing a parent field), where the parent's fields are
+  offered. Between two unrelated top-level forms the reference has no matching `<option>` and the
+  select falls back to "— Select —" **even when the stored id is perfectly correct** — which reads
+  exactly like a broken import and is not one. Verified both ways on one import: repeater child →
+  parent field showed "Parent trigger" selected; unrelated top-level form → stored
+  `hide_field => ['19197']` (correct) with a blank dropdown. So **never diagnose conditional logic
+  from the builder alone** — read `wp_frm_fields.field_options` or `list-fields`. And treat a form
+  in the blank state as read-only: pressing Update posts the empty select over the correct id.
+
 ### Entries
 
 - **XML entry import preserves the `<id>` from the file and can take over an existing entry row with that ID** (observed: a test import whose XML contained `<id>258</id>` absorbed the live entry occupying id 258). Never import an entries-containing XML into a site whose data you care about as a "test" — use a scratch site, or strip `<item>` blocks first.

@@ -22,6 +22,28 @@ Text/JSON goes in `<![CDATA[ ... ]]>` tags. JSON in CDATA is typically single-es
 5. Field conditions use **parallel arrays** (`hide_field` / `hide_field_cond` / `hide_opt`)
 6. Action conditions use **object form** (`{"0":{...}}`) except `quiz_outcome` (array of rules)
 
+## The `<options>` element is not `<field_options>`
+
+Two separate columns, two separate elements. `<field_options>` is the settings map; `<options>` is
+the **choice list** for fields that have one. The importer reads `<options>` through
+`FrmAppHelper::maybe_json_decode` (`FrmXMLHelper::fill_field`), so a JSON array works and is easier
+to hand-author than the PHP-serialized form a real export writes.
+
+**A `product` field needs a real choice list even when `data_type` is `single`.**
+`formidable-pro/classes/views/frmpro-fields/front-end/product-single.php:18` `foreach`es over
+`$field['options']` unconditionally, so an empty `<options>` emits
+`PHP Warning: foreach() argument must be of type array|object, string given` on every render,
+including each builder page load. The field still imports and still remaps; only the log tells you.
+A product field created through the UI stores `["","Product 1"]` — leading empty entry included, so
+copy that shape:
+
+```xml
+<options><![CDATA[["","Product 1"]]]></options>
+```
+
+Choice fields (radio, checkbox, select) take the same JSON array. Fields with no choice list keep
+`<options><![CDATA[]]></options>`.
+
 ## Field Options (field_options JSON)
 
 Common to most fields:

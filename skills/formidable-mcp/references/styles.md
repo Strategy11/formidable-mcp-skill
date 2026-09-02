@@ -6,6 +6,12 @@ Read this when: creating, updating, querying, assigning, or deleting Formidable 
 
 Styles control the appearance and layout of Formidable forms. Each style is a WordPress post of type `frm_styles` whose `post_content` holds a JSON object of style properties. Styles are assigned to forms via the form's `custom_style` option.
 
+### The generated stylesheet is cached until a style is saved
+
+The per-style CSS that `formidableforms.css` serves is generated once from `single-style.css.php` (plus the Pro `*.css.php` files) and stored in the `frmpro_css` option and transient. Nothing regenerates it on a page load, so **editing any `.css.php` file has no effect on the front end until a style is saved** — the change is simply invisible, which reads as "the fix did not work". A plugin version bump regenerates it in the wild; locally, open any style in the styler and hit Update. Plain `.css` files (`flatpickr.css`, `frm-datepicker.css`) are served straight from disk and need no save.
+
+Worth checking first whenever a teammate cannot reproduce a styling change on a branch you can see working, or vice versa.
+
 ## MCP Abilities
 
 | Ability | Purpose | Key parameters |
