@@ -313,6 +313,24 @@ All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` 
 | `list-application-items` | List all items in an application | readonly, idempotent |
 | `delete-application` | Delete an application (requires application_id) | destructive |
 
+### Coupons (requires the Formidable Coupons add-on)
+| Ability | Description | Notes |
+|---|---|---|
+| `list-coupons` | List coupons (id, name, code, amount, uses, dates, `allowed_form_ids`, computed status); supports paging, `order_by` (`id`/`name`/`date`/`modified`), `search` (name or code), `form_id` | readonly, idempotent |
+| `get-coupon` | Get one coupon — **`id` accepts the numeric ID or the coupon code** | readonly, idempotent |
+| `create-coupon` | Create a coupon; requires `name`, `code`, `amount`. **Also send `start` and `allowed_form_ids` or the coupon never applies** — see `coupons.md` and the active bug in `gotchas.md` | not idempotent |
+| `update-coupon` | Update a coupon by ID or code; only keys sent are changed. `code`/`amount` are frozen once the coupon has been used | not idempotent |
+| `delete-coupon` | Delete a coupon by ID or code; submitted entries keep their code | destructive |
+
+### Landing Pages (requires the Formidable Landing Pages add-on)
+| Ability | Description | Notes |
+|---|---|---|
+| `list-landing-pages` | List the site's landing pages (id, form_id/form_key, slug, url, status, enabled, content, layout, background); supports paging, `status`, `order` | readonly, idempotent |
+| `get-landing-page` | Get one by `form` (ID/key) or `id` (post ID); **404 when the form has none** — the way to ask whether a form has one | readonly, idempotent |
+| `save-landing-page` | **The write to use.** Upserts the one landing page for a `form` — creates or updates, never duplicates. Returns `created` and `form_embed_injected` | idempotent |
+| `update-landing-page` | Update by landing page `id`; cannot reassign the form. Prefer `save-landing-page` | not idempotent |
+| `delete-landing-page` | Delete by `form` or `id`; hard-deletes and clears the form's toggle. `force: false` trashes instead | destructive |
+
 ### Views (requires Formidable Views plugin)
 `list-views`, `get-view`, `create-view`, `update-view`, `delete-view`
 

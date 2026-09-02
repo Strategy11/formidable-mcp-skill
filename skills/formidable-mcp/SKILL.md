@@ -1,6 +1,6 @@
 ---
 name: formidable-mcp
-description: Create, query, and manage everything in Formidable Forms via MCP — first-time setup and connecting a site, forms, fields, repeaters, entries, views, styles, form actions (email/confirmation/webhook), applications, PDF downloads, templates, and troubleshooting known MCP bugs
+description: Create, query, and manage everything in Formidable Forms via MCP — first-time setup and connecting a site, forms, fields, repeaters, entries, views, styles, form actions (email/confirmation/webhook), applications, coupons/discount codes, form landing pages, PDF downloads, templates, and troubleshooting known MCP bugs
 ---
 
 ## Overview
@@ -30,6 +30,8 @@ Read the reference file(s) for the task at hand BEFORE making MCP calls. Do not 
 | Gated content — restrict private pages/posts/files/PDFs/Views behind a form submission, access tokens/links | `references/actions.md` (action + tokens) and `references/shortcodes.md` §5 (`[frm_gated_content]`) |
 | Writing shortcodes — email/confirmation bodies, View content, form HTML, field defaults, conditionals, stats/graphs | `references/shortcodes.md` |
 | Applications (Pro) | `references/applications.md` |
+| **Coupons / discount codes** — creating codes, percentage vs flat discounts, assigning a coupon to a form, usage limits, coupon status | `references/coupons.md` — **read before any `create-coupon`**, three required fields alone produce a coupon that never applies |
+| **Form landing pages** — giving a form its own page at the site root, page content/design, enabling or removing one | `references/landing-pages.md` |
 | PDF downloads — `[frm-pdf]` links in views/pages/emails, entry/View PDFs, email PDF attachments, Dompdf rendering constraints | `references/pdfs.md` |
 | Graphs/charts (`[frm-graph]`), stats, search — full treatment is in the shortcodes reference | `references/shortcodes.md` §8 |
 | MCP setup, session protocol, abilities catalog, auth, errors | `references/mcp-protocol.md` |
