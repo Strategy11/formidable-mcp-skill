@@ -194,7 +194,7 @@ Parameters:
 | `content` | String — raw HTML for classic views, JSON box array for layout views (see formats below) |
 | `limit` | Integer — max entries to display |
 | `before_content` / `after_content` | Classic views: HTML rendered once before/after the repeating content (table open/close, headers) |
-| `table_options` | Table views: array of numeric field IDs to use as columns — box content and header names are generated automatically from the fields |
+| `table_options` | Table views: array of numeric field IDs to use as columns — box content and header names are generated automatically from the fields. For columns that are anything more than one bare field, send a box array in `content` instead (see § "Table views") |
 | `timeline_options` | Timeline views: array of `{"name": ..., "value": ...}` pairs. Useful names: `title`, `description`, `thumbnail`, `date` (field IDs as string values), `date_format` (`year`/`date`/custom), `card_content_order`, `show_details_popup`, `add_divider` (see `FrmViewsTimelineController::$default_settings`). Content is generated at render time; the view's `content` stays empty |
 | `calendar_options` | Calendar views: array of `{"name": ..., "value": field_id}` pairs — names `start_date`, `end_date`, `title` |
 | `map_address_fields` | Map views: array of address field IDs |
@@ -515,7 +515,7 @@ The card frame (background, border, radius, padding) comes from **box 0's `style
 
 ### Grid views: columns, card styling, and the box/layout model
 
-**For any card- or column-based layout, create the view with `type: "grid"` rather than building a CSS grid inside a classic view.** A grid view already ships the responsive container, the per-entry card wrapper, a column setting, and a set of card style settings — reproducing that with `before_content: "<div class=grid>"` plus `display:grid` in Custom CSS re-implements what the product does natively, and skips the settings a site owner can later edit in the Views editor. Use classic (`type: "all"`) for tables, lists, and free-form HTML.
+**For any card- or column-based layout, create the view with `type: "grid"` rather than building a CSS grid inside a classic view.** A grid view already ships the responsive container, the per-entry card wrapper, a column setting, and a set of card style settings — reproducing that with `before_content: "<div class=grid>"` plus `display:grid` in Custom CSS re-implements what the product does natively, and skips the settings a site owner can later edit in the Views editor. And **for anything tabular, create the view with `type: "table"`** rather than hand-writing `<table>` markup in a classic view — see the next section. Classic (`type: "all"`) is for lists, free-form HTML, and the narrow set of tables whose *row markup itself* has to be custom (grouped/multi-row headers, `colspan`/`rowspan`, a `<tfoot>` totals row).
 
 **Rendered structure** (verified in the browser):
 
@@ -655,6 +655,46 @@ Practical rules, all learned the hard way:
 
 **Sizing sanity check.** `grid_column_count` divides the *theme's content column*, not the window. In a typical ~580px single-post column, 3 cards land at ~186px each and text wraps badly; 2 cards at ~280px read well. Measure the rendered card width before settling on a column count rather than assuming 3- or 4-up looks good.
 
+### Table views: columns, detail links, and styling
+
+A table view (`type: "table"`) is a **layout view** like grid: one box per **column**, one row per entry, and Views renders the whole table — `<table class="with_frm_style …">`, a `<thead>` built from the column names, `<tbody>` with one `<tr>` per entry and one `<td>` per box. Prefer it over a hand-built classic table: the markup, the responsive collapse, zebra striping, form-style integration and the editable column list in the Views editor all come for free, and a site owner can reorder or add columns in the editor afterwards instead of editing HTML.
+
+**A fully custom table view is one MCP `create-view` call** (verified end-to-end — four columns, a cell-wide detail link, a conditional, ordering, Custom CSS):
+
+```json
+{
+  "form_id": "24", "name": "Locations", "type": "table", "status": "publish",
+  "content": "[{\"box\":1,\"name\":\"City\",\"content\":\"[100]\",\"detailsLink\":1},{\"box\":2,\"name\":\"Region\",\"content\":\"[97] <small>([98])</small>\"},{\"box\":3,\"name\":\"Country\",\"content\":\"[if 95][95][/if 95]\"},{\"box\":4,\"name\":\"Actions\",\"content\":\"<a href=\\\"[detaillink]\\\">Details</a>\"}]",
+  "detail_content": "[{\"box\":1,\"content\":\"<h2>[100]</h2><p>[94]</p>\"}]",
+  "options": {
+    "table_responsive": 1,
+    "table_row_style": "frm-alt-table",
+    "table_classes": "locations-table",
+    "order_by": ["100"], "order": ["ASC"],
+    "listing_page_custom_css": ".locations-table th { text-transform: uppercase; }"
+  }
+}
+```
+
+Rendered (verified): `<table class="frm-view-content-<id> with_frm_style frm-responsive-table frm-alt-table locations-table">`, `<th>City</th>…`, and each cell `<td style='--v-responsive-table-label:"City";'>`.
+
+How the pieces work:
+
+- **Column box keys** in the `content` array: `box` (id), `name` (the `<th>` text — shortcodes allowed, including `[if get]`), `content` (any HTML plus field shortcodes, exactly like a classic row's `<td>` innards), and `detailsLink: 1` to wrap that entire cell in the entry's detail link.
+- **Column order = box order**, and the listing layout is built/patched from the boxes in `content` automatically (`FrmAPIViewsController::sync_layout_with_box_content()`), so a table view needs **no `create-view-layout` call** — not even for a detail-link column.
+- **`create-view` renumbers box ids** (send `1,2,3,4`, get `1,3,5,7`), `update-view` does not — same gotcha as grid. Read the ids back with `get-view` before re-sending `content` on an update.
+- **`table_options`** (array of field IDs) is the shortcut for plain one-field columns; header and content are generated from each field. Use a `content` box array as soon as a column needs markup, two fields, a conditional, or a link.
+- **Settings** (`options`): `table_row_style` — `""` (match theme styles) / `frm-alt-table` (zebra, the default) / `frm-grid` (full borders); `table_responsive: 1` collapses each column into a labeled row below 760px, the label coming from `name` (truncated at 40 chars, filter `frm_views_responsive_table_max_column_length`); `table_classes` appends classes to the `<table>`. Filters, `page_size`, `order_by`/`order`, `empty_msg` and `listing_page_custom_css` behave exactly as on any other view.
+- **`before_content`/`after_content` still render, but outside the `<table>`** — use them for intro copy or a legend, not for a custom `<thead>`.
+- **Detail pages**: a `detail_content` box array auto-creates the required detail layout (verified: `[{"id":0,"layout":1,"boxes":[{"id":1}]}]`) and flips `frm_show_count` to `dynamic`.
+
+Real limitations — the only reasons to fall back to a classic `<table>`:
+
+- One `<tr>` per entry and one `<td>` per box: **no `colspan`/`rowspan`, no grouped or multi-row headers, no `<tfoot>` totals row**, no `<th>` row headers inside the body.
+- **No per-column `style` object** — a box's `style` is honored for grid cells only. Column colors, padding and alignment go in `listing_page_custom_css` (`.locations-table td:nth-child(2) { … }`), and there is no column-width setting.
+- **No front-end sortable column headers.** Sorting is view-level (`order_by`/`order`), or user-driven through the search/sort shortcodes and query params — a table view does not make its `<th>`s clickable.
+- **`view_export_possible` is not auto-set on API writes.** The editor sets it to `1` for every table view; MCP writes don't, so pass `options: {"show_export_view": "1", "view_export_possible": "1"}` yourself (verified: with the flag set, `[frm-export-view]` renders its link for a native table view).
+
 ### View Shortcodes Must Use Field KEYS, Not Field Names
 
 When writing view templates, ALWAYS use field keys (e.g., `[lwrli]`), NEVER field names (e.g., `[story_category]`).
@@ -705,7 +745,7 @@ Alternative: field IDs also work (e.g., `[13086]`), but field keys are preferred
 Per view type:
 
 - **Classic (`all`)**: `detail_content` is raw HTML. Setting a non-empty value auto-switches `frm_show_count` to `dynamic` (required for detail routing — the API keeps it in sync; clearing the content switches it back to `all`).
-- **Grid / table (layout views)**: `detail_content` is a JSON box array (same format as listing content), and a **detail layout** must exist: `create-view-layout` with `type: "detail"`, e.g. `data: [{"id":0,"layout":1,"boxes":[{"id":1}]}]`. For table views, a detail-link column needs its box added to BOTH the content JSON (`{"box":4,"name":"Details","content":"<a href=\"[detaillink]\">View</a>"}`) and the listing layout's `boxes` array — `create-view-layout` upserts, so re-send the full listing layout with the new box.
+- **Grid / table (layout views)**: `detail_content` is a JSON box array (same format as listing content), and a **detail layout** must exist — but `create-view` builds it from the `detail_content` boxes for you (`sync_layout_with_box_content( $view_id, 'detail', … )`, verified: `[{"id":0,"layout":1,"boxes":[{"id":1}]}]`). Only `update-view` skips it: it syncs the *listing* layout alone, so adding `detail_content` to an existing view still needs `create-view-layout` with `type: "detail"`. For a **table** view, a detail-link column is just another box in `content` — `create-view`/`update-view` sync the listing layout with the content boxes automatically (`FrmAPIViewsController::sync_layout_with_box_content()`), so no `create-view-layout` call is needed; either put `<a href="[detaillink]">View</a>` in the box's `content` or set `detailsLink: 1` on a box to wrap that whole cell in the link.
 - **Timeline**: `detail_content` is raw HTML. A non-empty value makes each card an entry link automatically; for the hover **details popup** instead, set `frm_options.timeline_options.settings.show_details_popup = 1` via the `options` param — send the complete `timeline_options` structure (`{style: [], settings: {...all keys...}}`), because `options` replaces top-level keys wholesale. Note: the timeline's own `/entry/<id>` links render the listing, not a detail page (detail routing only honors `dynamic`/`calendar` views) — prefer the popup.
 
 ## Querying Views
