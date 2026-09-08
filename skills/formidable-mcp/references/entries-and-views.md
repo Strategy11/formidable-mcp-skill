@@ -282,7 +282,37 @@ Parameters:
 
 **`get-view` returns the persisted filters and before/after content.** View responses (get/create/update/list) include `before_content`, `after_content`, and `options` — the stored `frm_options` with the `where`/`where_is`/`where_val` filter arrays, `empty_msg`, ordering, etc. — alongside the earlier keys (`content`, `created_at`, `date_field_id`, `detail_content`, `form_id`, `id`, `limit`, `slug`, `status`, `title`, `updated_at`, `url`, `view_type`). A view with no stored options returns `options` as an empty object. Verify filters straight from the API response; fixed in `FrmAPIViewsController::prepare_item_for_response()`, covered by `test_get_view_returns_options_and_before_after_content` and `test_get_view_without_options_returns_object`. On older formidable-api builds `get-view` returned none of these three keys — there, verify in the view editor instead.
 
-Filters are set through `options`: `where` (array of field IDs), `where_is` (array of operators), `where_val` (array of values, which may contain shortcodes such as `[get param=name]`). These parallel arrays are positional — index 0 of each belongs to the same rule. Example child-view filter for nested views:
+Filters are set through `options`: `where` (array of field IDs), `where_is` (array of operators), `where_val` (array of values, which may contain shortcodes such as `[get param=name]`). These parallel arrays are positional — index 0 of each belongs to the same rule.
+
+### Filter groups: how the editor actually stores them
+
+Six parallel arrays, not three. Alongside `where` / `where_is` / `where_val` there are `where_or` (this row's relation to the row above it, inside its group), `where_group` (which group the row belongs to) and `where_group_or` (this group's relation to the group before it). Verified by building two groups in the real filter modal and reading `frm_options` back out of `wp_postmeta`:
+
+```
+where:          [0 => '14215',  1 => 'is_draft']    // "Colour equals red OR [group] Entry status equals Draft"
+where_is:       [0 => '=',      1 => '=']
+where_val:      [0 => 'red',    1 => '1']
+where_or:       [0 => 0,        1 => 0]
+where_group:    [0 => 0,        1 => 1]
+where_group_or: [0 => 0,        1 => 1]
+```
+
+**The two relations are each a single choice, not one per row.** This is the thing most likely to send you building filters the editor cannot save, and both the query and its tests assume it:
+
+- **`where_group_or` is one value for the entire filter.** The modal shows an And/Or select between each pair of groups, but changing any of them writes the same value to all of them (`syncGroupSiblingAndOrValues`, bound near the top of `js/editor.js`), and every select after the first is rendered disabled (`addFilterEntriesModalGroup`). So a filter is either **all** ANDed groups or **all** ORed groups. There is no "A OR B AND C" across groups. The first group's rows always carry `0`, since there is no group before them to be joined to.
+- **`where_or` is one value per group.** Changing a row's And/Or select writes the same value to every row in that group (`syncNestedSiblingAndOrValues`), and only the second row's select is enabled. So a group's rows are **all** ANDed or **all** ORed, never mixed. Different groups may still differ from one another.
+- Both are written on **every row** they cover, including the first row of a group, which carries its group's row relation even though nothing precedes it. A fixture that sets a relation only on the row that "introduces" it is not reproducing real data — `FrmViewsUnitTest::apply_editor_filter_relations()` exists to fill the rest in.
+
+"A or B, and C" is still expressible, just not as ORed groups followed by an ANDed one: it is **one group holding A and B joined by Or**, ANDed with a second group holding C.
+
+Four more things that are easy to get wrong:
+
+- **Rows are numbered from 0** when the editor saves them, but from **1** when `FrmViewsPreviewHelper::prepare_view_object()` builds them for the preview. Anything reading these arrays has to work with either.
+- **`where_group` is the group's position** — a contiguous integer from 0, never with a gap, since `getActiveFilterModalData()` numbers the groups by iterating the row wrappers. Not an id.
+- **Operators are stored exactly as `FrmViewsDisplaysHelper::get_where_is_options()` spells them**: `=`, `!=`, `>`, `<`, `>=`, `<=`, `LIKE`, `not LIKE`, `LIKE%`, `%LIKE`, `group_by`, `group_by_newest`. `LIKE` is uppercase — a lowercase `like` takes a different code path in `prepare_where_val_for_id_and_key_columns()` and behaves differently.
+
+**A draft check has two different meanings and they are not interchangeable.** `FrmViewsDisplaysController::move_drafts_param_to_filter()` appends an `is_draft` row to `frm_where` for every query (from the `drafts` shortcode att, defaulting to `0`), and that row is appended **without** a `where_group` entry. A draft check the user picks in the filter UI ("Entry status") is an ordinary row that **does** have a `where_group` entry and takes part in that group's and/or logic. The presence of a `where_group` entry is what tells them apart. Note `move_drafts_param_to_filter` leaves a user's row alone when the shortcode has no `drafts` att, and otherwise updates that row's value in place rather than appending a second one.
+ Example child-view filter for nested views:
 
 ```json
 {
@@ -453,7 +483,13 @@ Verified behavior (formidable-api + formidable-views):
 - **`options` merges on update.** Sending `options: {"grid_column_count": 2}` to `update-view` leaves `listing_page_custom_css`, `order_by`, and the rest untouched (verified) — you never need to re-send the whole options object to change one key.
 
 > **Gotcha — don't size view CSS in `rem`.** `rem` resolves against the *theme's* root font-size, and the 62.5%-root trick is common: on Twenty Twenty `html` is **10px** while body text is 18px, so `font-size: .78rem` renders at **7.8px**, not the ~12.5px intended. Every `rem` value silently comes out at 62.5% of what you meant, and it changes per theme. Use `px` for predictable sizing (or `em`, which inherits the real body size). Check with `getComputedStyle(document.documentElement).fontSize` before trusting `rem` in a view.
-- The rendered view is wrapped in `<div class="frm-view-content-<id>">…</div>`, and Views prints the CSS inline on the page (`FrmViewsInlineStyleController`). Handy for confirming in the browser which view a rule belongs to.
+- Views prints the CSS inline on the page (`FrmViewsInlineStyleController`). Handy for confirming in the browser which view a rule belongs to.
+
+- **The scope class is added for every way a view renders**, including `[display-frm-data]` on a page. It comes from the view being rendered, in `FrmViewsDisplaysController::filter_final_content()`, so the view's own permalink and an embedded copy behave the same.
+
+> **Version note — Custom CSS did nothing on an embedded view before this was fixed.** The class used to be added by `add_view_wrapper_class()` hooked to `the_content`, which read `global $post` and bailed unless that post was the view itself. On a page, `global $post` is the *page*, so no element got `frm-view-content-<id>`, every scoped rule failed to match, and the view rendered unstyled — silently, with the CSS still present in a `<style>` block and `get-view` returning it intact. If you hit that on an older formidable-views, either update or put the scope class on the view content's own root element yourself (`<div class="scores frm-view-content-11382">`), which works because the API emits both `.frm-view-content-<id> .child` and `.child.frm-view-content-<id>` for every rule.
+>
+> Either way: **verify styling on the URL you actually ship**, with `getComputedStyle` on a styled element rather than by eyeballing the text.
 
 Worked pattern (a card gallery — verified rendering end-to-end). **Note the `type: "grid"`**: for anything laid out as cards or columns, use a grid view and its built-in column setting rather than a classic view with a hand-rolled `display:grid` container — see "Grid views" below for why.
 

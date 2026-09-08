@@ -32,6 +32,25 @@ A repeatable field group requires FOUR components, in this order:
 - Renders hidden markup; JavaScript (formidablepro.js) turns it into the add/remove buttons.
 - Note: if `create-field` rejects the `end_divider` type, check the formidable-api plugin's ability validator (`FrmAPIAbilitiesController.php`) — `end_divider` must appear in its allowed field-type enums.
 
+## Repeater child fields need a field_order inside the divider's range
+
+Applies to **XML import and hand-authored template files**, where you choose the numbers. Via MCP
+on a live form the builder assigns them for you.
+
+The builder renders one flat list: it opens a `<ul class="frm_sorting">` at a `divider` and closes
+it at the matching `end_divider` (`formidable/classes/views/frm-forms/add_field.php:112`), filling
+it from the parent form's and the child form's fields **merged on `field_order`**. A child field
+whose `field_order` falls outside that window sorts elsewhere, and the section renders the empty
+**"Add Fields Here"** placeholder — even when `parent_form_id`, `form_select` and `in_section` are
+all correct. Nothing in the data looks wrong, which makes it a slow thing to spot.
+
+Verified against a hand-built repeater: divider `field_order` 7, child form fields **8 and 9**,
+`end_divider` 10 — one continuous sequence spanning both forms. A file that gave the child field
+order 0 while the divider sat at 20 imported with every id and link correct and an empty repeater.
+
+Leave gaps rather than making the numbers adjacent (step by 10): the importer sometimes shifts one
+form's orders by +1 and not another's, and adjacent values then collide.
+
 ## CRITICAL RULE: form_select Must ALWAYS Be Set
 
 **`form_select` MUST always be set to a child form ID, on every repeater divider, in every pattern — even for the simplest repeater.**
