@@ -361,7 +361,7 @@ Set the outcome's display name with the **top-level `post_title`** parameter. A 
 - **How to verify scheduling without waiting:** entry creation (MCP `create-entry` included) queues a single WP-cron event, hook `formidable_send_autoresponder`, args `[entry_id, action_id]`, timestamp = reference date ± interval (verified: +10 minutes landed at +601s). Inspect the queue with `wp cron event list`. `wp cron event run formidable_send_autoresponder` fires it early; the event is consumed from the queue after running.
 - Deleting an entry unschedules its pending events (`frm_before_destroy_entry` hook).
 
-Payment actions (`stripe`, `square`, `paypal`, `payment`) need live gateway credentials to exercise; don't submit test payments against a connected merchant account.
+Payment actions (`stripe`, `square`, `paypal`, `payment`) need live gateway credentials to exercise; don't submit test payments against a connected merchant account. Full treatment — payloads, payment fields, and the payment/subscription record abilities — is in `payments.md`.
 
 ## Workflow: Create Form with Multiple Actions
 

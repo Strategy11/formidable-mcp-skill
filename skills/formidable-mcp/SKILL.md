@@ -1,6 +1,6 @@
 ---
 name: formidable-mcp
-description: Create, query, and manage everything in Formidable Forms via MCP — first-time setup and connecting a site, forms, fields, repeaters, entries, views, styles, form actions (email/confirmation/webhook), applications, coupons/discount codes, form landing pages, PDF downloads, templates, and troubleshooting known MCP bugs
+description: Create, query, and manage everything in Formidable Forms via MCP — first-time setup and connecting a site, forms, fields, repeaters, entries, views, styles, form actions (email/confirmation/webhook), applications, coupons/discount codes, payments/subscriptions (Stripe/Square/PayPal), WPML translations, form landing pages, PDF downloads, templates, and troubleshooting known MCP bugs
 ---
 
 ## Overview
@@ -31,6 +31,8 @@ Read the reference file(s) for the task at hand BEFORE making MCP calls. Do not 
 | Writing shortcodes — email/confirmation bodies, View content, form HTML, field defaults, conditionals, stats/graphs | `references/shortcodes.md` |
 | Applications (Pro) | `references/applications.md` |
 | **Coupons / discount codes** — creating codes, percentage vs flat discounts, assigning a coupon to a form, usage limits, coupon status | `references/coupons.md` — **read before any `create-coupon`**, three required fields alone produce a coupon that never applies |
+| **Payments** — payment/payment-gateway fields, Stripe/Square/PayPal/Authorize.net gateway actions, listing/refunding payments or cancelling subscriptions | `references/payments.md` — **never submit a test payment against a connected merchant account; verify by reading the action back, not by charging a card** |
+| **Translations** — WPML-backed form/field string translations (requires the WPML compatibility add-on + WPML active) | `references/translations.md` — `string_id` (source string) and `translation_id` (one language's translation) are different IDs, don't mix them up |
 | **Form landing pages** — giving a form its own page at the site root, page content/design, enabling or removing one | `references/landing-pages.md` |
 | PDF downloads — `[frm-pdf]` links in views/pages/emails, entry/View PDFs, email PDF attachments, Dompdf rendering constraints | `references/pdfs.md` |
 | Graphs/charts (`[frm-graph]`), stats, search — full treatment is in the shortcodes reference | `references/shortcodes.md` §8 |

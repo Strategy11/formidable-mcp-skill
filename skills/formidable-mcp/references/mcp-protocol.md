@@ -338,7 +338,7 @@ All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` 
 `list-view-layouts`, `get-view-layout`, `create-view-layout`, `update-view-layout`, `delete-view-layout`
 
 ### Payments (Lite core — always available, no add-on required)
-Read/manage transaction records from whichever gateway add-on (Stripe/Square/PayPal) processed them. **No create/edit** — a payment is created by the gateway's own checkout flow, never via MCP.
+Read/manage transaction records from whichever gateway add-on (Stripe/Square/PayPal) processed them. **No create/edit** — a payment is created by the gateway's own checkout flow, never via MCP. Full treatment — payment fields, gateway actions, and these records — is in `payments.md`.
 
 | Ability | Description | Notes |
 |---|---|---|
@@ -371,7 +371,7 @@ List, read, and delete debug logs. **No create/update** — logs are written by 
 | `delete-log` | Permanently delete a single log entry (bypasses trash) | destructive |
 
 ### Translations (requires the WPML compatibility add-on, with WPML itself active)
-List and manage translations for every normally-translatable string in a form (labels, descriptions, choices, validation messages — form-level and field-level), backed by WPML's own String Translation tables.
+List and manage translations for every normally-translatable string in a form (labels, descriptions, choices, validation messages — form-level and field-level), backed by WPML's own String Translation tables. Full treatment is in `translations.md`.
 
 | Ability | Description | Notes |
 |---|---|---|
