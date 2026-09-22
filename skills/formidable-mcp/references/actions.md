@@ -331,6 +331,8 @@ Verified quiz-action behaviors (5-question scored quiz):
 - **`get-stats` works on the `quiz_score` field ID** — `average`/`maximum` etc. compute from the numeric value (verified: avg 2.67 / max 5 across scores 5, 3, 0, 2).
 - With `show_result: "correct_answers"`, the confirmation shows a per-question results table, revealing "Correct answer: X" only on missed questions.
 
+**Timer settings** (add-on 3.2+) live at the same top level as `quiz`/`enable`/`show_result` — `timer_enabled` (toggle), `timer_duration` (**seconds**, integer), `start_button_label` (text, defaults to "Start Quiz"). Full detail, including the auto-inserted `quiz_timer` field and server-side enforcement, is in `templates.md` § "Timer (optional countdown, add-on 3.2+)" — read it before enabling a timer, the `timer_duration` unit is easy to get wrong.
+
 **`quiz_outcome`** — one action per outcome, selected by the action's own `conditions`; needs a `quiz_score` field on the form (see the `create-form-action` caveat in `gotchas.md`):
 
 How the winner is picked (`FrmQuizzesOutcomeHelper::get_outcome()`, verified with a 4-outcome quiz): each outcome scores **the number of its conditions the entry matches**, and the highest score wins. `any_all` is irrelevant to that scoring — it is a plain match count, so the natural design for an N-result personality quiz is one condition per question on each outcome, letting the majority answer decide. **Ties break alphabetically by outcome title**, not by creation order or menu order, because `FrmFormAction::action_args()` queries actions with `orderby => 'title', order => 'ASC'` (confirmed: a 2-2 tie went to "Hufflepuff" over the earlier-created "Slytherin", and a 4-way tie went to "Gryffindor"). An outcome with **no** conditions becomes the fallback used when nothing else scores, and outcomes with empty content are skipped so users never land on a blank result.
@@ -361,7 +363,7 @@ Set the outcome's display name with the **top-level `post_title`** parameter. A 
 - **How to verify scheduling without waiting:** entry creation (MCP `create-entry` included) queues a single WP-cron event, hook `formidable_send_autoresponder`, args `[entry_id, action_id]`, timestamp = reference date ± interval (verified: +10 minutes landed at +601s). Inspect the queue with `wp cron event list`. `wp cron event run formidable_send_autoresponder` fires it early; the event is consumed from the queue after running.
 - Deleting an entry unschedules its pending events (`frm_before_destroy_entry` hook).
 
-Payment actions (`stripe`, `square`, `paypal`, `payment`) need live gateway credentials to exercise; don't submit test payments against a connected merchant account.
+Payment actions (`stripe`, `square`, `paypal`, `payment`) need live gateway credentials to exercise; don't submit test payments against a connected merchant account. Full treatment — payloads, payment fields, and the payment/subscription record abilities — is in `payments.md`.
 
 ## Workflow: Create Form with Multiple Actions
 

@@ -106,6 +106,8 @@ skills/formidable-mcp/
 │   ├── styles.md             # Styles, themes, appearance
 │   ├── actions.md            # Email, confirmation, webhook, post creation, gated content
 │   ├── applications.md       # Applications (Pro)
+│   ├── coupons.md            # Discount codes: amounts, form assignment, limits, status
+│   ├── landing-pages.md      # Form landing pages: the 1:1 upsert, slugs, content, design
 │   ├── pdfs.md               # PDF downloads and email attachments
 │   ├── templates.md          # Form template XML import/export
 │   ├── mcp-protocol.md       # Transports, auth, session protocol, abilities catalog, errors

@@ -288,7 +288,7 @@ All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` 
 ### Form Actions
 | Ability | Description | Notes |
 |---|---|---|
-| `list-form-actions` | List all post-submission actions for a form | readonly |
+| `list-form-actions` | List a form's post-submission actions — `form_id`, `type`, `post_status`, `page`, `page_size` | readonly; `page_size` capped at 200, default 200 |
 | `get-form-action` | Get single form action by id | readonly |
 | `create-form-action` | Create a form action (email, webhook, etc.) | not idempotent |
 | `update-form-action` | Update an existing form action | not idempotent |
@@ -313,11 +313,79 @@ All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` 
 | `list-application-items` | List all items in an application | readonly, idempotent |
 | `delete-application` | Delete an application (requires application_id) | destructive |
 
+### Coupons (requires the Formidable Coupons add-on)
+| Ability | Description | Notes |
+|---|---|---|
+| `list-coupons` | List coupons (id, name, code, amount, uses, dates, `allowed_form_ids`, computed status); supports paging, `order_by` (`id`/`name`/`date`/`modified`), `search` (name or code), `form_id` | readonly, idempotent |
+| `get-coupon` | Get one coupon — **`id` accepts the numeric ID or the coupon code** | readonly, idempotent |
+| `create-coupon` | Create a coupon; requires `name`, `code`, `amount`. **Also send `start` and `allowed_form_ids` or the coupon never applies** — see `coupons.md` and the active bug in `gotchas.md` | not idempotent |
+| `update-coupon` | Update a coupon by ID or code; only keys sent are changed. `code`/`amount` are frozen once the coupon has been used | not idempotent |
+| `delete-coupon` | Delete a coupon by ID or code; submitted entries keep their code | destructive |
+
+### Landing Pages (requires the Formidable Landing Pages add-on)
+| Ability | Description | Notes |
+|---|---|---|
+| `list-landing-pages` | List the site's landing pages (id, form_id/form_key, slug, url, status, enabled, content, layout, background); supports paging, `status`, `order` | readonly, idempotent |
+| `get-landing-page` | Get one by `form` (ID/key) or `id` (post ID); **404 when the form has none** — the way to ask whether a form has one | readonly, idempotent |
+| `save-landing-page` | **The write to use.** Upserts the one landing page for a `form` — creates or updates, never duplicates. Returns `created` and `form_embed_injected` | idempotent |
+| `update-landing-page` | Update by landing page `id`; cannot reassign the form. Prefer `save-landing-page` | not idempotent |
+| `delete-landing-page` | Delete by `form` or `id`; hard-deletes and clears the form's toggle. `force: false` trashes instead | destructive |
+
 ### Views (requires Formidable Views plugin)
 `list-views`, `get-view`, `create-view`, `update-view`, `delete-view`
 
 ### View Layouts (requires FrmAPIViewLayoutsController)
 `list-view-layouts`, `get-view-layout`, `create-view-layout`, `update-view-layout`, `delete-view-layout`
+
+### Payments (Lite core — always available, no add-on required)
+Read/manage transaction records from whichever gateway add-on (Stripe/Square/PayPal) processed them. **No create/edit** — a payment is created by the gateway's own checkout flow, never via MCP. Full treatment — payment fields, gateway actions, and these records — is in `payments.md`.
+
+| Ability | Description | Notes |
+|---|---|---|
+| `list-payments` | List payments — `form_id`, `status`, `page`, `page_size`, `order_by`, `order` | readonly, idempotent |
+| `get-payment` | Get one payment by `id` | readonly |
+| `delete-payment` | Delete a payment record | destructive |
+| `refund-payment` | Refund a payment through its original gateway (dispatches on the payment's `paysys`: `stripe`/`square`/`paypal`) | destructive, not idempotent |
+
+Payment object fields: `id`, `item_id`, `action_id`, `receipt_id`, `invoice_id`, `sub_id`, `amount`, `status`, `paysys`, `begin_date`, `expire_date`, `created_at`, `test`.
+
+### Subscriptions (Lite core — always available, no add-on required)
+Same shape as Payments, for recurring subscriptions. **No create/edit.**
+
+| Ability | Description | Notes |
+|---|---|---|
+| `list-subscriptions` | List subscriptions — `form_id`, `status`, `page`, `page_size`, `order_by`, `order` | readonly, idempotent |
+| `get-subscription` | Get one subscription by `id` | readonly |
+| `delete-subscription` | Delete a subscription record | destructive |
+| `cancel-subscription` | Cancel a subscription through its original gateway (dispatches on `paysys`) | destructive, not idempotent |
+
+Subscription object fields: `id`, `item_id`, `action_id`, `sub_id`, `amount`, `first_amount`, `interval_count`, `time_interval`, `fail_count`, `end_count`, `next_bill_date`, `status`, `paysys`, `created_at`, `test`.
+
+### Logs (requires the Logs add-on)
+List, read, and delete debug logs. **No create/update** — logs are written by Formidable's own operation (webhook failures, add-on activity), never via MCP.
+
+| Ability | Description | Notes |
+|---|---|---|
+| `list-logs` | List logs — `form_id`, `search`, `page`, `page_size`, `order` | readonly, idempotent |
+| `get-log` | Get one log entry by `id`, including its custom fields/context | readonly |
+| `delete-log` | Permanently delete a single log entry (bypasses trash) | destructive |
+
+### Translations (requires the WPML compatibility add-on, with WPML itself active)
+List and manage translations for every normally-translatable string in a form (labels, descriptions, choices, validation messages — form-level and field-level), backed by WPML's own String Translation tables. Full treatment is in `translations.md`.
+
+| Ability | Description | Notes |
+|---|---|---|
+| `list-translatable-strings` | List every translatable string for a form — requires `form_id`, optional `search` | readonly, idempotent |
+| `get-translation` | Get one string's translation in a given language — requires `string_id` + `language` | readonly |
+| `create-translation` | Add a translation for a `string_id` + `language`; **errors if one already exists** (use `update-translation` instead) | not idempotent |
+| `update-translation` | Update an existing translation for a `string_id` + `language`; **errors if none exists** (use `create-translation` instead) | not idempotent |
+| `delete-translation` | Delete a single translation row by `translation_id` — deletes only that language's translation, not the source string or its other translations | destructive |
+
+Two different IDs are in play here, and mixing them up is the most likely mistake:
+- **`string_id`** — the id of the *source string* (a row in WPML's `icl_strings`), returned by `list-translatable-strings` as each item's `id`. Used by `get-translation`, `create-translation`, `update-translation`.
+- **`translation_id`** — the id of one *specific translation* (a row in WPML's `icl_string_translations`), returned by `get-translation`/`create-translation`/`update-translation` as `translation_id` in their response. Used only by `delete-translation`. There is no bulk "delete all translations of this string" ability — that would require unregistering the source string entirely, which this ability set intentionally does not expose.
+
+Typical sequence: `list-translatable-strings` (form_id) → pick a `string_id` → `get-translation` (string_id + language) to see the current value → `create-translation` or `update-translation` depending on whether one already exists → `delete-translation` (translation_id) if it needs removing later.
 
 ### Implementation details
 - Each ability has an `input_schema`, `output_schema`, `execute_callback`, and `permission_callback`
@@ -365,11 +433,15 @@ Two verified behaviors of inline `fields[]`:
 ### list-entries parameters
 - `form_id`: filter by form
 - `page`: pagination (default: 1)
-- `page_size`: results per page
+- `page_size`: results per page, **capped at 200** (see note below)
 - `order_by`: sort field
 - `search`: search query
 - `start_date` / `end_date`: date range filtering
 - `is_draft`: 0 = submitted only, 1 = drafts only; **drafts are included when omitted**
+
+### The 200-per-page cap
+
+Every paginated `list-*` ability caps `page_size` at 200 per call — `list-entries`, `list-forms`, `list-payments`, `list-subscriptions`, and `list-form-actions` all clamp a requested `page_size` down to 200 (silently, not an error) and default to 200 or less if `page_size` is omitted. To read more than 200 rows total, increment `page` and keep calling rather than requesting a bigger `page_size`. Only `list-entries`/`list-payments`/`list-subscriptions` describe the cap in their own schema text; `list-forms` and `list-form-actions` enforce it just as strictly even though older tool descriptions may not spell it out — don't assume an uncapped result set from any `list-*` ability without checking whether you actually got everything (compare the row count returned against what you expected, or keep paging until a page comes back short).
 
 ## Field types reference
 

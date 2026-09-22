@@ -59,7 +59,7 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
 - `formidable-forms/list-forms` — parameters: `{}`; returns array with `{id, form_key, name, status}`
 - `formidable-forms/create-field` — parameters: `form_id`, `type`, `name`, `required`, `field_order`, `field_options`; `options` accepts both plain strings (`"Option 1"`) and objects with separate values (`{"label": "Low", "value": "low"}`). When any option's label differs from its value, `separate_value` is enabled automatically, so entries validate against the VALUES (`"low"`), not the labels. Validation errors from `create-entry`/`update-entry` come back as readable strings (`"field123: Priority is invalid"`)
 - `formidable-forms/update-field` — parameters: `id` (field ID), plus fields to change (e.g. `field_order`, `options`, `field_options`, `default_value` — all persist correctly); `form_id` is optional (derived from the field)
-- `formidable-forms/list-fields` — response `data` is an OBJECT keyed by field_key, NOT an array
+- `formidable-forms/list-fields` — response `data` is an OBJECT keyed by field_key, NOT an array; `options` comes back in whatever form it's stored in — plain strings or `{label, value}` objects (fixed: the output schema used to declare strings only and errored on any form with object-form options; now matches what `create-field`/`update-field` accept and store)
 
 ## Form Cache Clearing
 
@@ -790,7 +790,16 @@ Key form-level settings (in form `<options>`):
 
 **Multi-page forms:** use the `break` field type to create page breaks.
 
-**Product fields:** product choices include price in the options array. Quantity fields reference their product: `"product_field":"[3334]"`.
+**Product fields:** product choices include price in the options array — each option is `{label, price, value, image, limit}`, and **the `price` key is required for the field to be worth anything**. Options sent as `{label, value}` are accepted, then render `data-frmprice=""` and a permanently $0.00 total. `create-field`/`update-field` both accept `price` even though the ability's schema description doesn't mention it:
+
+```json
+{"type": "product", "name": "Plan", "options": [
+  {"label": "Widget", "price": "100", "value": "widget"},
+  {"label": "Gadget", "price": "250", "value": "gadget"}
+]}
+```
+
+Quantity fields reference their product: `"product_field":"[3334]"`. For discounts on top of a product field see `coupons.md`.
 
 **Composite fields:** Name and Address fields use JSON for `default_value` and `placeholder`:
 - Name: `{"first":"","middle":"","last":""}`
