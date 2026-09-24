@@ -1,6 +1,6 @@
 # Forms & Fields
 
-Read this when: creating or updating Formidable forms and fields via the MCP adapter — field types, option formats, submit button ordering, repeaters, lookup/dynamic/AI fields, "Other" write-in options, calculations, and conditional logic.
+Read this when: listing or counting forms, or creating or updating Formidable forms and fields via the MCP adapter — field types, option formats, submit button ordering, repeaters, lookup/dynamic/AI fields, "Other" write-in options, calculations, and conditional logic.
 
 ## MCP Call Pattern
 
@@ -56,10 +56,16 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
 **Core abilities:**
 - `formidable-forms/create-form` — parameters: `name`, `description`, `status`, `logged_in`, `is_template`, `editable`, `fields` (array), `parent_form_id` (integer; persists the child→parent link, e.g. for repeater child forms), and `options` (object). **`options` is applied as the form is created** — `submit_value`, `ajax_submit`, `success_msg`, `success_action` and the rest all take effect in the one call, and any option left out is created with its default. No follow-up `update-form` is needed just to set form options.
 - `formidable-forms/update-form` — parameters: `id` (required), plus `name`, `description`, `status` (published/draft), `options` (object), `parent_form_id` (integer; `0` to detach)
-- `formidable-forms/list-forms` — parameters: `{}`; returns array with `{id, form_key, name, status}`
+- `formidable-forms/list-forms` — parameters include `page` and `page_size`; returns an object keyed by `form_key`, with summaries such as `{id, form_key, name, status}`. The default page size is 50, capped at 200.
 - `formidable-forms/create-field` — parameters: `form_id`, `type`, `name`, `required`, `field_order`, `field_options`; `options` accepts both plain strings (`"Option 1"`) and objects with separate values (`{"label": "Low", "value": "low"}`). When any option's label differs from its value, `separate_value` is enabled automatically, so entries validate against the VALUES (`"low"`), not the labels. Validation errors from `create-entry`/`update-entry` come back as readable strings (`"field123: Priority is invalid"`)
 - `formidable-forms/update-field` — parameters: `id` (field ID), plus fields to change (e.g. `field_order`, `options`, `field_options`, `default_value` — all persist correctly); `form_id` is optional (derived from the field)
 - `formidable-forms/list-fields` — response `data` is an OBJECT keyed by field_key, NOT an array; `options` comes back in whatever form it's stored in — plain strings or `{label, value}` objects (fixed: the output schema used to declare strings only and errored on any form with object-form options; now matches what `create-field`/`update-field` accept and store)
+
+## Counting Forms
+
+`list-forms` includes non-trashed repeater/embedded child forms as well as top-level forms. It excludes templates and trashed forms. Fetch every page (for example, `page_size: 200` until a page has fewer than 200 results); one page's length is not the site total.
+
+To match the Forms screen's non-trashed count, call `get-form` for each listed form and count only those whose `parent_form_id` is `0` or empty. `list-forms` summaries do not include `parent_form_id`. The Forms screen hides child forms and counts Trash separately. State which count you are reporting when the user asks for a total.
 
 ## Form Cache Clearing
 

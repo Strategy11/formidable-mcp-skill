@@ -1,6 +1,6 @@
 # Known Bugs & Gotchas
 
-Read this when: an MCP ability call fails, silently does nothing, or returns empty results — check here for known symptoms before debugging from scratch.
+Read this when: an MCP ability call fails, silently does nothing, returns empty results, or a list count disagrees with the admin screen — check here for known symptoms before debugging from scratch.
 
 ## Active Bugs
 
@@ -67,6 +67,7 @@ When a new failure appears, record it here (symptom → cause → status) and pr
 
 ### Forms & Applications
 
+- **`list-forms` includes repeater/embedded child forms, so its total can exceed the Forms screen count.** Child forms have `parent_form_id > 0`, but that field is absent from list summaries. Page through the full list, use `get-form` to check each parent ID, and count only top-level forms when comparing with the Forms screen. Trash is excluded from `list-forms` and counted separately in the admin. See `forms-and-fields.md` § "Counting Forms".
 - **MCP-created forms/fields are equivalent to builder-created ones — don't "fix" the differences.** MCP forms omit the auto `submit` field the builder adds, and MCP fields store only the base default `field_options` (the builder's AJAX insert adds ~54 extra Pro keys). Both are benign: forms render a working submit button via the `submit_html` fallback, absent field_options resolve to defaults through `FrmField::get_option`, and opening the form in the builder self-heals both. Don't force-add the missing keys.
 - **Draft forms are invisible inside applications.** `add-item-to-application` succeeds and writes the `_frm_form_id` termmeta, but `FrmProApplication::get_forms_for_application()` filters `status = 'published'`, so a draft form is missing from `list-application-items` and the card's form count. Publish the form and it appears — this is core Pro behavior, not an MCP bug.
 - **`get-form` rendered HTML: the parameter is `return: "html"`** (a `format` param is silently ignored); the markup comes back in `data.renderedHtml` and includes the assigned style's `frm_style_*` class — useful for verifying style assignment without a browser.

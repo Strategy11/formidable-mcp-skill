@@ -20,7 +20,7 @@ Read the reference file(s) for the task at hand BEFORE making MCP calls. Do not 
 | Task | Read |
 |---|---|
 | **First-time setup / "how do I connect this?" / auth failures on the first call** | `references/getting-started.md` |
-| Create/edit forms, add fields, field types & options, form settings | `references/forms-and-fields.md` |
+| List/count forms, compare counts with the Forms screen, create/edit forms, add fields, field types & options, form settings | `references/forms-and-fields.md` |
 | Repeaters (repeatable sections) or nested/embedded forms | `references/repeaters.md` — **always**, this is the most error-prone area |
 | Entries (submissions), views, field statistics | `references/entries-and-views.md` |
 | **Choosing a view type, styling a view, or laying one out** — tables, card grids, column counts, view Custom CSS | `references/entries-and-views.md` § "Styling views", § "Grid views" and § "Table views" — **read before writing any view content**, see rule 9 |
