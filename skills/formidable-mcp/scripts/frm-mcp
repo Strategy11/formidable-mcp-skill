@@ -45,7 +45,22 @@ _env_application_password="${APPLICATION_PASSWORD:-}"
 
 URL="${SITE_URL%/}/wp-json/mcp/formidable-mcp"
 AUTH="$WP_USERNAME:$APPLICATION_PASSWORD"
-SESSION_FILE="$DIR/.mcp-session"
+# Client name sent in the initialize handshake, which the site records to show
+# which assistant made each request. FRM_MCP_CLIENT overrides the detection.
+if [ -n "${FRM_MCP_CLIENT:-}" ]; then
+  CLIENT="$FRM_MCP_CLIENT"
+elif [ -n "${CLAUDECODE:-}" ]; then
+  CLIENT="claude-code"
+elif [ -n "${CODEX_THREAD_ID:-}" ] || env | grep -q '^CODEX_'; then
+  CLIENT="codex"
+else
+  CLIENT="frm-mcp"
+fi
+
+# One session per client. The site ties every request to the client that
+# opened its session, so Claude Code and Codex running this same directory
+# must not reuse each other's session.
+SESSION_FILE="$DIR/.mcp-session-$(printf '%s' "$CLIENT" | tr -c 'A-Za-z0-9._-' '_')"
 
 # Build the TLS options curl runs with. Expanded as ${TLS_OPTS[@]+"${TLS_OPTS[@]}"}
 # below — under `set -u`, bash 3.2 (stock on macOS) treats a bare "${arr[@]}" on an
@@ -77,10 +92,13 @@ else
 fi
 
 init_session() {
+  local body
+  body=$(jq -nc --arg c "$CLIENT" \
+    '{jsonrpc:"2.0",method:"initialize",params:{protocolVersion:"2025-11-25",capabilities:{},clientInfo:{name:$c,version:"1.0"}},id:1}')
   curl -s -i ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
     -H "Content-Type: application/json" \
     -u "$AUTH" \
-    -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
+    -d "$body" \
     2>/dev/null | grep -i "mcp-session-id" | head -1 | cut -d' ' -f2 | tr -d '\r' > "$SESSION_FILE"
 }
 
