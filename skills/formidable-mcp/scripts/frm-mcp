@@ -53,6 +53,12 @@ elif [ -n "${CLAUDECODE:-}" ]; then
   CLIENT="claude-code"
 elif [ -n "${CODEX_THREAD_ID:-}" ] || env | grep -q '^CODEX_'; then
   CLIENT="codex"
+elif [ -n "${GROK_SESSION_ID:-}" ]; then
+  CLIENT="grok"
+elif [ -n "${CURSOR_TRACE_ID:-}" ]; then
+  # Every process Cursor starts inherits it, the assistants above run inside
+  # Cursor's terminal included, so it is checked after them.
+  CLIENT="cursor"
 else
   CLIENT="frm-mcp"
 fi
