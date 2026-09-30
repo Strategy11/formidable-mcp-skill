@@ -13,7 +13,7 @@ Form actions are stored as **WordPress posts** with specific requirements:
 - **post_type:** `'frm_form_actions'` (MUST be set correctly)
 - **post_status:** `'publish'`
 - **post_parent:** Form ID (links action to form)
-- **post_excerpt:** Action type ("email", "on_submit", "confirmation", "wppost", etc.)
+- **post_excerpt:** Action type ("email", "on_submit", "wppost", etc.)
 - **post_content:** JSON serialized object with action-specific settings
 
 ### Example: Email Action Record
@@ -118,7 +118,7 @@ For the complete catalog — `[default-message]` parameters, conditionals (`[if 
 ```bash
 cat > /tmp/create_confirmation_action.jsonl << 'JSON'
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"1429","type":"confirmation","post_content":{"success_action":"message","success_msg":"Your message here","event":["create"]}}}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"1429","type":"on_submit","post_content":{"success_action":"message","success_msg":"Your message here","event":["create"]}}}}}
 JSON
 
 cat /tmp/create_confirmation_action.jsonl | wp --path="/path/to/site" mcp-adapter serve --server=formidable-mcp --user=1 2>/dev/null | tail -1 | jq '.result.structuredContent.data | {id, type}'
@@ -129,7 +129,7 @@ Canonical create payload:
 ```json
 {
   "form_id": "1429",
-  "type": "confirmation",
+  "type": "on_submit",
   "post_content": {
     "success_action": "message",
     "success_msg": "Your message here",
@@ -260,10 +260,9 @@ cat /tmp/delete_action.jsonl | wp --path="/path/to/site" mcp-adapter serve --ser
 
 ## Action Types
 
-Types documented with working MCP payloads in this file: **email**, **confirmation** (success message/redirect/page — modern forms store this as the `on_submit` action; both type strings appear on real sites), **wppost** (create post), **gated_content** (access-token-gated content).
+Types documented with working MCP payloads in this file: **email**, **on_submit** (success message/redirect/page — the admin UI calls it "Confirmation" or "Success messages", but `confirmation` is NOT a type id and `create-form-action` rejects it with "Invalid action type"), **wppost** (create post), **gated_content** (access-token-gated content).
 
 Other types that exist as `post_excerpt` values (settings-level keys for several are in `templates.md` — payment, quiz, quiz_outcome):
-- **on_submit** — modern confirmation/redirect action (`on_submit_migrated: "1"` form option)
 - **payment** — Stripe/Square/Authorize.net (gateway, amount, recurring settings)
 - **register** — WordPress user registration (Registration add-on)
 - **quiz** / **quiz_outcome** — quiz scoring and outcomes
@@ -384,7 +383,7 @@ cat /tmp/email.jsonl | wp --path="/path/to/site" mcp-adapter serve --server=form
 # Create confirmation action
 CONFIRM_ID=$(cat > /tmp/confirm.jsonl << 'JSON'
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"$FORM_ID","type":"confirmation","post_content":{"success_action":"message","success_msg":"Thanks for submitting!","event":["create"]}}}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"$FORM_ID","type":"on_submit","post_content":{"success_action":"message","success_msg":"Thanks for submitting!","event":["create"]}}}}}
 JSON
 cat /tmp/confirm.jsonl | wp --path="/path/to/site" mcp-adapter serve --server=formidable-mcp --user=1 2>/dev/null | tail -1 | jq -r '.result.structuredContent.data.id')
 

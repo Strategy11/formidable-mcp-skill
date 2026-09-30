@@ -113,7 +113,7 @@ When a new failure appears, record it here (symptom → cause → status) and pr
 ```json
 {
   "form_id": "1429",
-  "type": "confirmation",
+  "type": "on_submit",
   "post_content": {
     "success_action": "message",
     "success_msg": "Your message here",
@@ -123,3 +123,5 @@ When a new failure appears, record it here (symptom → cause → status) and pr
 ```
 
 **Note:** The confirmation message lives at `post_content.success_msg`, NOT `confirmation_message`.
+
+**The type id is `on_submit`, not `confirmation`.** "Confirmation" is only the UI label; `type: "confirmation"` fails with "Invalid action type".

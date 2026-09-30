@@ -770,7 +770,7 @@ Each action includes `"conditions"` to control when it runs and `"event": ["crea
 ```json
 {
   "form_id": "1429",
-  "type": "confirmation",
+  "type": "on_submit",
   "post_content": {
     "success_action": "message",
     "success_msg": "You submitted the form!",
