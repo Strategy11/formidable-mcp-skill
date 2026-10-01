@@ -12,9 +12,11 @@
 #   frm-mcp formidable-forms/create-entry '{"form_id": "123", "456": "value"}'
 #
 # Configuration comes from env vars SITE_URL, WP_USERNAME, APPLICATION_PASSWORD,
-# falling back to a frm-mcp.env file next to this script — so secrets never
-# appear on the command line or in permission prompts. frm-mcp.env is
-# machine-specific: create it locally and never commit it. Example:
+# falling back to a frm-mcp.env file — so secrets never appear on the command
+# line or in permission prompts. The file is looked for at $FRM_MCP_ENV, then
+# next to this script, then at ~/.config/formidable-mcp/frm-mcp.env, the
+# location that survives plugin updates. It is machine-specific: download it
+# from Formidable -> Settings -> MCP, and never commit it. Example:
 #   SITE_URL="https://your-site.local"
 #   WP_USERNAME="admin"
 #   APPLICATION_PASSWORD="xxxx xxxx xxxx xxxx xxxx xxxx"
@@ -34,18 +36,50 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 _env_site_url="${SITE_URL:-}"
 _env_wp_username="${WP_USERNAME:-}"
 _env_application_password="${APPLICATION_PASSWORD:-}"
-[ -f "$DIR/frm-mcp.env" ] && . "$DIR/frm-mcp.env"
+# A plugin install keeps this script in a versioned cache directory that the
+# next update replaces, so a file beside it would be left behind; the config
+# directory is the stable home, and beside-the-script still works for clones.
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/formidable-mcp"
+if [ -n "${FRM_MCP_ENV:-}" ]; then
+  ENV_FILE="$FRM_MCP_ENV"
+elif [ -f "$DIR/frm-mcp.env" ]; then
+  ENV_FILE="$DIR/frm-mcp.env"
+else
+  ENV_FILE="$CONFIG_DIR/frm-mcp.env"
+fi
+[ -f "$ENV_FILE" ] && . "$ENV_FILE"
 [ -n "$_env_site_url" ] && SITE_URL="$_env_site_url"
 [ -n "$_env_wp_username" ] && WP_USERNAME="$_env_wp_username"
 [ -n "$_env_application_password" ] && APPLICATION_PASSWORD="$_env_application_password"
 
-: "${SITE_URL:?Set SITE_URL (env or frm-mcp.env)}"
-: "${WP_USERNAME:?Set WP_USERNAME (env or frm-mcp.env)}"
-: "${APPLICATION_PASSWORD:?Set APPLICATION_PASSWORD (env or frm-mcp.env)}"
+: "${SITE_URL:?Set SITE_URL (env or $ENV_FILE) — run frm-mcp-setup}"
+: "${WP_USERNAME:?Set WP_USERNAME (env or $ENV_FILE) — run frm-mcp-setup}"
+: "${APPLICATION_PASSWORD:?Set APPLICATION_PASSWORD (env or $ENV_FILE) — run frm-mcp-setup}"
 
 URL="${SITE_URL%/}/wp-json/mcp/formidable-mcp"
 AUTH="$WP_USERNAME:$APPLICATION_PASSWORD"
-SESSION_FILE="$DIR/.mcp-session"
+# Client name sent in the initialize handshake, which the site records to show
+# which assistant made each request. FRM_MCP_CLIENT overrides the detection.
+if [ -n "${FRM_MCP_CLIENT:-}" ]; then
+  CLIENT="$FRM_MCP_CLIENT"
+elif [ -n "${CLAUDECODE:-}" ]; then
+  CLIENT="claude-code"
+elif [ -n "${CODEX_THREAD_ID:-}" ] || env | grep -q '^CODEX_'; then
+  CLIENT="codex"
+elif [ -n "${GROK_SESSION_ID:-}" ]; then
+  CLIENT="grok"
+elif [ -n "${CURSOR_TRACE_ID:-}" ]; then
+  # Every process Cursor starts inherits it, the assistants above run inside
+  # Cursor's terminal included, so it is checked after them.
+  CLIENT="cursor"
+else
+  CLIENT="frm-mcp"
+fi
+
+# One session per client. The site ties every request to the client that
+# opened its session, so Claude Code and Codex running this same directory
+# must not reuse each other's session.
+SESSION_FILE="$DIR/.mcp-session-$(printf '%s' "$CLIENT" | tr -c 'A-Za-z0-9._-' '_')"
 
 # Build the TLS options curl runs with. Expanded as ${TLS_OPTS[@]+"${TLS_OPTS[@]}"}
 # below — under `set -u`, bash 3.2 (stock on macOS) treats a bare "${arr[@]}" on an
@@ -77,10 +111,13 @@ else
 fi
 
 init_session() {
+  local body
+  body=$(jq -nc --arg c "$CLIENT" \
+    '{jsonrpc:"2.0",method:"initialize",params:{protocolVersion:"2025-11-25",capabilities:{},clientInfo:{name:$c,version:"1.0"}},id:1}')
   curl -s -i ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
     -H "Content-Type: application/json" \
     -u "$AUTH" \
-    -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}},"id":1}' \
+    -d "$body" \
     2>/dev/null | grep -i "mcp-session-id" | head -1 | cut -d' ' -f2 | tr -d '\r' > "$SESSION_FILE"
 }
 
@@ -110,4 +147,11 @@ fi
 # NOTE the parentheses close BEFORE the final `// .result` — binding the
 # alternative inside the pipe makes non-JSON error text crash jq instead of
 # printing the error envelope.
+# A response with no .result is an HTTP-level error (401, the scoped-password
+# 403, a WordPress error page as JSON). Printing .result alone showed it as a
+# bare `null`, so show the error itself and fail.
+if ! echo "$out" | jq -e 'has("result")' >/dev/null 2>&1; then
+  echo "$out" | jq '.' 2>/dev/null || echo "$out"
+  exit 1
+fi
 echo "$out" | jq '.result.structuredContent // (.result.content[0].text | fromjson?) // .result'

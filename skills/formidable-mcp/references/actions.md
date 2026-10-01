@@ -13,7 +13,7 @@ Form actions are stored as **WordPress posts** with specific requirements:
 - **post_type:** `'frm_form_actions'` (MUST be set correctly)
 - **post_status:** `'publish'`
 - **post_parent:** Form ID (links action to form)
-- **post_excerpt:** Action type ("email", "on_submit", "confirmation", "wppost", etc.)
+- **post_excerpt:** Action type ("email", "on_submit", "wppost", etc.)
 - **post_content:** JSON serialized object with action-specific settings
 
 ### Example: Email Action Record
@@ -118,7 +118,7 @@ For the complete catalog — `[default-message]` parameters, conditionals (`[if 
 ```bash
 cat > /tmp/create_confirmation_action.jsonl << 'JSON'
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"1429","type":"confirmation","post_content":{"success_action":"message","success_msg":"Your message here","event":["create"]}}}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"1429","type":"on_submit","post_content":{"success_action":"message","success_msg":"Your message here","event":["create"]}}}}}
 JSON
 
 cat /tmp/create_confirmation_action.jsonl | wp --path="/path/to/site" mcp-adapter serve --server=formidable-mcp --user=1 2>/dev/null | tail -1 | jq '.result.structuredContent.data | {id, type}'
@@ -129,7 +129,7 @@ Canonical create payload:
 ```json
 {
   "form_id": "1429",
-  "type": "confirmation",
+  "type": "on_submit",
   "post_content": {
     "success_action": "message",
     "success_msg": "Your message here",
@@ -260,10 +260,9 @@ cat /tmp/delete_action.jsonl | wp --path="/path/to/site" mcp-adapter serve --ser
 
 ## Action Types
 
-Types documented with working MCP payloads in this file: **email**, **confirmation** (success message/redirect/page — modern forms store this as the `on_submit` action; both type strings appear on real sites), **wppost** (create post), **gated_content** (access-token-gated content).
+Types documented with working MCP payloads in this file: **email**, **on_submit** (success message/redirect/page — the admin UI calls it "Confirmation" or "Success messages", but `confirmation` is NOT a type id and `create-form-action` rejects it with "Invalid action type"), **wppost** (create post), **gated_content** (access-token-gated content).
 
 Other types that exist as `post_excerpt` values (settings-level keys for several are in `templates.md` — payment, quiz, quiz_outcome):
-- **on_submit** — modern confirmation/redirect action (`on_submit_migrated: "1"` form option)
 - **payment** — Stripe/Square/Authorize.net (gateway, amount, recurring settings)
 - **register** — WordPress user registration (Registration add-on)
 - **quiz** / **quiz_outcome** — quiz scoring and outcomes
@@ -331,6 +330,8 @@ Verified quiz-action behaviors (5-question scored quiz):
 - **`get-stats` works on the `quiz_score` field ID** — `average`/`maximum` etc. compute from the numeric value (verified: avg 2.67 / max 5 across scores 5, 3, 0, 2).
 - With `show_result: "correct_answers"`, the confirmation shows a per-question results table, revealing "Correct answer: X" only on missed questions.
 
+**Timer settings** (add-on 3.2+) live at the same top level as `quiz`/`enable`/`show_result` — `timer_enabled` (toggle), `timer_duration` (**seconds**, integer), `start_button_label` (text, defaults to "Start Quiz"). Full detail, including the auto-inserted `quiz_timer` field and server-side enforcement, is in `templates.md` § "Timer (optional countdown, add-on 3.2+)" — read it before enabling a timer, the `timer_duration` unit is easy to get wrong.
+
 **`quiz_outcome`** — one action per outcome, selected by the action's own `conditions`; needs a `quiz_score` field on the form (see the `create-form-action` caveat in `gotchas.md`):
 
 How the winner is picked (`FrmQuizzesOutcomeHelper::get_outcome()`, verified with a 4-outcome quiz): each outcome scores **the number of its conditions the entry matches**, and the highest score wins. `any_all` is irrelevant to that scoring — it is a plain match count, so the natural design for an N-result personality quiz is one condition per question on each outcome, letting the majority answer decide. **Ties break alphabetically by outcome title**, not by creation order or menu order, because `FrmFormAction::action_args()` queries actions with `orderby => 'title', order => 'ASC'` (confirmed: a 2-2 tie went to "Hufflepuff" over the earlier-created "Slytherin", and a 4-way tie went to "Gryffindor"). An outcome with **no** conditions becomes the fallback used when nothing else scores, and outcomes with empty content are skipped so users never land on a blank result.
@@ -361,7 +362,7 @@ Set the outcome's display name with the **top-level `post_title`** parameter. A 
 - **How to verify scheduling without waiting:** entry creation (MCP `create-entry` included) queues a single WP-cron event, hook `formidable_send_autoresponder`, args `[entry_id, action_id]`, timestamp = reference date ± interval (verified: +10 minutes landed at +601s). Inspect the queue with `wp cron event list`. `wp cron event run formidable_send_autoresponder` fires it early; the event is consumed from the queue after running.
 - Deleting an entry unschedules its pending events (`frm_before_destroy_entry` hook).
 
-Payment actions (`stripe`, `square`, `paypal`, `payment`) need live gateway credentials to exercise; don't submit test payments against a connected merchant account.
+Payment actions (`stripe`, `square`, `paypal`, `payment`) need live gateway credentials to exercise; don't submit test payments against a connected merchant account. Full treatment — payloads, payment fields, and the payment/subscription record abilities — is in `payments.md`.
 
 ## Workflow: Create Form with Multiple Actions
 
@@ -382,7 +383,7 @@ cat /tmp/email.jsonl | wp --path="/path/to/site" mcp-adapter serve --server=form
 # Create confirmation action
 CONFIRM_ID=$(cat > /tmp/confirm.jsonl << 'JSON'
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"$FORM_ID","type":"confirmation","post_content":{"success_action":"message","success_msg":"Thanks for submitting!","event":["create"]}}}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"$FORM_ID","type":"on_submit","post_content":{"success_action":"message","success_msg":"Thanks for submitting!","event":["create"]}}}}}
 JSON
 cat /tmp/confirm.jsonl | wp --path="/path/to/site" mcp-adapter serve --server=formidable-mcp --user=1 2>/dev/null | tail -1 | jq -r '.result.structuredContent.data.id')
 

@@ -6,7 +6,7 @@
 #   ./frm-mcp-setup
 #
 # It is safe to run repeatedly and it changes nothing except creating
-# frm-mcp.env from the example template when that file is missing. It never
+# frm-mcp.env from the example template when no config file exists yet. It never
 # asks for a password, never prints credential values, and never sends
 # anything anywhere except the site you configured.
 #
@@ -20,7 +20,16 @@
 # Exit code 0 means the connection works and you can start making calls.
 set -uo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
-ENV_FILE="$DIR/frm-mcp.env"
+# Same lookup as frm-mcp: $FRM_MCP_ENV, then beside the script (clones), then
+# the per-user config directory that survives plugin updates.
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/formidable-mcp"
+if [ -n "${FRM_MCP_ENV:-}" ]; then
+  ENV_FILE="$FRM_MCP_ENV"
+elif [ -f "$DIR/frm-mcp.env" ]; then
+  ENV_FILE="$DIR/frm-mcp.env"
+else
+  ENV_FILE="$CONFIG_DIR/frm-mcp.env"
+fi
 EXAMPLE_FILE="$DIR/frm-mcp.env.example"
 
 if [ -t 1 ]; then
@@ -57,7 +66,8 @@ fi
 step "2. Configuration file (frm-mcp.env)"
 if [ ! -f "$ENV_FILE" ]; then
   if [ -f "$EXAMPLE_FILE" ]; then
-    cp "$EXAMPLE_FILE" "$ENV_FILE"
+    mkdir -p "$(dirname "$ENV_FILE")"
+    (umask 077 && cp "$EXAMPLE_FILE" "$ENV_FILE")
     warn "created $ENV_FILE from the example template"
   else
     fail "no $ENV_FILE and no example template to copy"
@@ -66,6 +76,10 @@ if [ ! -f "$ENV_FILE" ]; then
   fi
 else
   pass "$ENV_FILE exists"
+  case "$(ls -l "$ENV_FILE" 2>/dev/null | cut -c5-10)" in
+    ------) ;;
+    *) warn "other users on this machine can read it — chmod 600 \"$ENV_FILE\"" ;;
+  esac
 fi
 
 # Read the file in a subshell-safe way; values are used, never printed.
@@ -82,8 +96,14 @@ if [ -n "$placeholder" ]; then
   fail "still holds template placeholders"
   cat <<EOF
 
-  Fill it in yourself — no one else needs these values, and an AI assistant
-  should never ask you to paste them into a chat:
+  The quickest fix: in WP Admin -> Formidable -> Settings -> MCP, click
+  "Download frm-mcp.env" and move the downloaded file to
+    $ENV_FILE
+  replacing this one. It holds a password scoped to Formidable MCP only.
+
+  On an older Formidable without that button, fill it in yourself — no one
+  else needs these values, and an AI assistant should never ask you to paste
+  them into a chat:
 
     1. Open $ENV_FILE in your editor.
     2. SITE_URL        — your site, e.g. https://example.com (no trailing slash needed)
@@ -140,9 +160,11 @@ if [ "$anon" = "404" ]; then
   fail "no MCP endpoint at $URL (404)"
   cat <<EOF
 
-  Either the Formidable API add-on (which ships the MCP adapter) is not active,
-  or permalinks are set to "Plain":
-    WP Admin -> Plugins            -> activate "Formidable Forms API"
+  The MCP server is off, can't run, or permalinks are set to "Plain":
+    WP Admin -> Formidable -> Settings -> MCP -> turn on "Enable the Formidable
+      MCP server". If it is on, that screen says why it isn't running (it needs
+      WordPress 7.0+ and PHP 7.4+). Formidable versions without an MCP settings
+      section need the "Formidable Forms API" add-on active instead.
     WP Admin -> Settings -> Permalinks -> any structure other than Plain
 EOF
   exit 1
@@ -161,9 +183,10 @@ if printf '%s' "$headers" | grep -qi 'rest_not_logged_in\|"status":401\|HTTP/[0-
   cat <<EOF
 
   Most likely, in order:
-    1. The application password was mistyped or has been revoked — generate a
-       fresh one (WP Admin -> Users -> Profile -> Application Passwords) and paste
-       it into $ENV_FILE. Do not paste it into a chat.
+    1. The password was mistyped or has been revoked — download a fresh
+       connection file (WP Admin -> Formidable -> Settings -> MCP -> Download
+       frm-mcp.env) and move it to $ENV_FILE.
+       Do not paste it into a chat.
     2. WP_USERNAME is not the *username* (it is not the display name or email).
     3. The user is not an administrator — most abilities check real capabilities.
     4. The host strips the Authorization header (common on Apache CGI/FastCGI).
@@ -201,7 +224,9 @@ views=$(curl -s --max-time 30 ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
   -H 'Content-Type: application/json' -H "Mcp-Session-Id: $SESSION" \
   -u "$WP_USERNAME:$APPLICATION_PASSWORD" \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/list-views","parameters":{}}},"id":3}' 2>/dev/null)
-if printf '%s' "$views" | grep -qi 'not found\|does not exist\|isError":true'; then
+if printf '%s' "$views" | grep -q 'frm_ability_addon_outdated'; then
+  warn "views abilities unavailable — Formidable Views is active but too old for them; update it (forms and entries still work)"
+elif printf '%s' "$views" | grep -qi 'not found\|does not exist\|isError":true'; then
   warn "views abilities unavailable — Formidable Views is not active (Pro feature; forms and entries still work)"
 else
   pass "views abilities available"

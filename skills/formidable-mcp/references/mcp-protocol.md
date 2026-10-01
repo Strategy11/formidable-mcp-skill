@@ -5,14 +5,14 @@ Read this when: you need to connect to, configure, or call the Formidable Forms 
 ## Access policy (mandatory)
 
 - **Use the Formidable MCP exclusively for ALL operations** — creates, updates, deletes, and normal reads. **Never fall back to the Formidable REST API** (`/wp-json/frm/v3/` current or `/wp-json/frm/v2/` legacy endpoints). MCP is the intended abstraction layer; REST fallbacks circumvent its validation and permission model.
-- Recommended: enforce this in your project by **deny-listing** the REST endpoints wherever your client configures command permissions (`.claude/settings.json` in Claude Code; other clients have an equivalent allow/deny list), leaving only the MCP endpoint reachable by curl:
+- If your client supports command deny rules, use them to block direct Formidable REST requests. For example, Claude Code can put rules like these in `.claude/settings.json`:
   ```json
   "deny": [
     "Bash(curl * /wp-json/frm*)",
     "Bash(curl * /wp-json/)"
   ]
   ```
-  With those rules in place, any attempt to curl other `/wp-json/` routes is blocked by the permission system.
+  This is Claude Code permission syntax, not Codex configuration. In every client, follow the MCP-only rule above regardless of whether equivalent command rules are available.
 - **Never write to the database directly.** MCP abilities handle validation, serialization, and cache clearing; raw writes bypass all three. When an MCP call fails, investigate the error rather than working around it.
 - If an MCP tool isn't exposing its abilities, **diagnose the MCP configuration** rather than routing around it (don't install packages manually, don't switch to REST, don't script direct DB writes). Workarounds mask the real problem and don't persist to future sessions.
 - For verifying WordPress admin state programmatically, prefer MCP abilities (`list-forms`, `get-form`, etc.) over browser-based admin-page authentication — MCP bypasses the login redirect entirely.
@@ -29,21 +29,33 @@ Read this when: you need to connect to, configure, or call the Formidable Forms 
 
 ## Connecting: credentials go in a file, never in the chat
 
-Before the first call, the site URL and credentials must be somewhere the tooling can read them. **The recommended setup is a `frm-mcp.env` file next to `scripts/frm-mcp`**, created by the site owner in an editor:
+Before the first call, the site URL and credentials must be somewhere the tooling can read them: a `frm-mcp.env` file. **The recommended way to get one is Formidable's own download** — WP Admin → **Formidable → Settings → MCP** → turn on **Enable the Formidable MCP server** → **Download frm-mcp.env**. The file comes finished, with a fresh application password that only works on the Formidable MCP endpoint (see § "Scoped connection-file passwords"). On a Formidable version without that button, the site owner creates an application password by hand and fills in `frm-mcp.env.example` instead (§ "Creating an application password").
+
+The helpers look for the file in this order, first match wins:
+
+1. `$FRM_MCP_ENV`, if set
+2. `frm-mcp.env` next to `scripts/frm-mcp` — fine for a cloned install
+3. `~/.config/formidable-mcp/frm-mcp.env` (`$XDG_CONFIG_HOME` is respected) — **the recommended location.** A plugin install keeps `scripts/` in a version-numbered cache directory that the next update replaces, and a file beside the script is left behind with it.
+
+Credentials stay out of version control, off the command line, and out of permission prompts — the helper reads them at call time instead.
+
+### Moving a downloaded file into place
+
+The setup prompt on Formidable's settings screen asks the assistant to do this step, and it is the one time an assistant handles the credential file. Move it; never read it:
 
 ```bash
-cd skills/formidable-mcp/scripts
-cp frm-mcp.env.example frm-mcp.env
-# then edit frm-mcp.env and fill in SITE_URL, WP_USERNAME, APPLICATION_PASSWORD
+f=$(ls -t ~/Downloads/frm-mcp*.env 2>/dev/null | head -1)    # browsers rename repeats: "frm-mcp (1).env"
+mkdir -p ~/.config/formidable-mcp
+mv "$f" ~/.config/formidable-mcp/frm-mcp.env && chmod 600 ~/.config/formidable-mcp/frm-mcp.env
 ```
 
-The file is gitignored, so credentials stay out of version control, off the command line, and out of permission prompts — the helper reads them at call time instead.
+Then run `scripts/frm-mcp-setup`. If no file matches, say so and ask the user to download it again — don't search further afield or ask for the values. Replacing an existing `frm-mcp.env` is expected (each download is a new password); once the new one connects, remind the user they can revoke the older files under **Manage connection files**. On macOS the terminal may need permission to read Downloads the first time; in Codex the move writes outside the workspace and needs approval to run outside the sandbox.
 
 **Never ask the user to paste credentials into the conversation, and never type them into a command.** An application password sent to an AI assistant is in the transcript, in the model provider's logs, and potentially in a permission prompt or shell history — it must be rotated afterward, so treat pasted credentials as burned. This applies to every route to the same secret:
 
-- **Do:** tell the user to run the `cp` above and fill in the file themselves; then just call `frm-mcp` and let it pick the values up. If a call fails on auth, report the failure and ask them to re-check the file — do not offer to take the password "just this once".
+- **Do:** point the user at **Download frm-mcp.env** (or, on older versions, the template they fill in themselves); move a downloaded file into place as above without opening it; then just call `frm-mcp` and let it pick the values up. If a call fails on auth, report the failure and ask them to re-check the file — do not offer to take the password "just this once".
 - **Don't:** ask "what's your application password?"; don't offer to write `frm-mcp.env` for them from values they supply in chat; don't put credentials in an inline `-u "user:password"` curl command, a `SITE_URL=… APPLICATION_PASSWORD=… frm-mcp …` prefix, or an `export` the user is told to run; don't echo, `cat`, or otherwise read the contents of `frm-mcp.env` back — checking that the file exists is enough.
-- If the user pastes a credential anyway, don't repeat it in your replies, and tell them plainly that it should be revoked and regenerated in WP Admin once the file is set up.
+- If the user pastes a credential anyway, don't repeat it in your replies, and tell them plainly that it should be revoked — **Formidable → Settings → MCP → Manage connection files → Revoke** for a downloaded file, **Users → Profile → Application Passwords** for one made by hand — and replaced with a fresh download.
 
 The same rule covers the WP-CLI transport: it needs no password at all, so if the user has shell access to the WordPress host, prefer it.
 
@@ -51,7 +63,7 @@ The same rule covers the WP-CLI transport: it needs no password at all, so if th
 
 | Transport | Use when | Needs |
 |---|---|---|
-| **HTTP endpoint (curl)** | You do NOT have shell access to the WordPress server — remote/production sites, shared hosting. **The most common case.** | An application password for an admin user; nothing but curl (+ jq) locally |
+| **HTTP endpoint (curl)** | You do NOT have shell access to the WordPress server — remote/production sites, shared hosting. **The most common case.** | A downloaded `frm-mcp.env` (or a hand-made application password) for an admin user; nothing but curl (+ jq) locally |
 | **WP-CLI stdio bridge** | You have a shell on the machine hosting WordPress (typical for local dev sites) | wp-cli and filesystem access to the install |
 
 Both transports expose identical abilities and accept identical `tools/call` bodies — every `ability_name`/`parameters` example in this skill's references works verbatim on either transport. Only the wrapping differs: HTTP needs Basic Auth + a session header; stdio needs neither.
@@ -62,7 +74,7 @@ Run the adapter as a local stdio MCP server through WP-CLI — no HTTP auth or s
 
 ### MCP client config
 
-Any MCP client that can launch a stdio server works. The server definition itself is identical everywhere — only the file it lives in, and the key it nests under, differ by client:
+Any MCP client that can launch a stdio server works. The `wp` command and arguments are the same; the configuration format differs by client. For clients using JSON with an `mcpServers` key:
 
 ```json
 {
@@ -83,15 +95,26 @@ Any MCP client that can launch a stdio server works. The server definition itsel
 }
 ```
 
+Codex uses TOML instead — `~/.codex/config.toml`, or `.codex/config.toml` in a trusted project (or run `codex mcp add formidable -- wp --path=... mcp-adapter serve --server=formidable-mcp --user=1`):
+
+```toml
+[mcp_servers.formidable]
+command = "wp"
+args = ["--path=/absolute/path/to/wordpress", "mcp-adapter", "serve", "--server=formidable-mcp", "--user=1"]
+```
+
+Check the connection with `codex mcp list`, or `/mcp` inside a session.
+
 | Client | Config file | Wrapper key |
 |---|---|---|
-| Claude Code | `.mcp.json` in the project root (or add it with `claude mcp add`) | `mcpServers` |
+| Claude Code | `.mcp.json` in the project root (or add it with `claude mcp add --scope project`) | `mcpServers` |
 | Claude Desktop | `claude_desktop_config.json` — macOS `~/Library/Application Support/Claude/`, Windows `%APPDATA%\Claude\` | `mcpServers` |
+| Codex | `~/.codex/config.toml`, or `.codex/config.toml` in a trusted project (or add it with `codex mcp add`) | `[mcp_servers.formidable]` (TOML) |
 | Cursor | `.cursor/mcp.json` in the project, or `~/.cursor/mcp.json` globally | `mcpServers` |
 | VS Code (agent mode) | `.vscode/mcp.json` | `servers` |
 | Anything else | see that client's MCP documentation | usually `mcpServers` |
 
-Locations move between releases — if one doesn't match what you see, the client's own MCP docs are authoritative. After saving, restart or reload the client so it launches the server, then confirm it appears in the client's MCP server list (in Claude Code, `/mcp`).
+Locations move between releases — if one doesn't match what you see, the client's own MCP docs are authoritative. After saving, restart or reload the client so it launches the server, then confirm it appears in the client's MCP server list (`/mcp` in Claude Code or Codex; `codex mcp list` from a terminal).
 
 Key points:
 - `--path` — absolute path to the WordPress install root
@@ -122,23 +145,37 @@ printf '%s\n' \
 
 **Authentication:** HTTP Basic Auth with a WordPress username and an application password, supplied by `frm-mcp.env` rather than typed into a command (see "Connecting" above). In the raw curl examples throughout this skill, `-u "USERNAME:APPLICATION_PASSWORD"` is a placeholder showing where the header comes from — run the calls through `scripts/frm-mcp` instead of substituting real values into them.
 
+### Scoped connection-file passwords
+
+A password created by **Download frm-mcp.env** is restricted by Formidable, on top of the user's normal capabilities:
+
+- **REST only** — it is rejected on XML-RPC and other transports.
+- **Only the `/mcp/formidable-mcp` route** — any other REST route, including `/wp/v2/*` and the Formidable REST API, returns `403 frm_mcp_skill_scope`.
+- **Only these JSON-RPC methods:** `initialize`, `notifications/initialized`, `ping`, `tools/list`, and `tools/call` for `mcp-adapter-execute-ability` / `mcp-adapter-get-ability-info` with a Formidable ability (category `formidable-forms`). **`mcp-adapter-discover-abilities` is blocked**, as are other plugins' abilities (e.g. `core/get-site-info`), `resources/*` and `prompts/*` — all `403 frm_mcp_skill_scope`. `tools/list` still lists `mcp-adapter-discover-abilities`, so its presence there doesn't mean it can be called. A JSON-RPC batch is rejected whole if any one item is out of scope.
+
+`scripts/frm-mcp` and `frm-mcp-setup` only send `initialize` and `execute-ability`, so they work unchanged. To look up an ability's schema with a scoped password, call `mcp-adapter-get-ability-info` with its name from § "Abilities catalog" rather than discovering it.
+
+Each download creates a new password and leaves the old ones working. The settings screen lists them under **Manage connection files**, with when each was last used, and revokes them one at a time. They keep working as ordinary application passwords if Formidable is deactivated — so revoke them first.
+
 ### Creating an application password (site owner, in the browser)
+
+Only needed on a Formidable version without **Download frm-mcp.env** — the download does all of this and scopes the password too.
 
 1. WP Admin → **Users → Profile** (of an **administrator** — the ability permission callbacks check real capabilities, so a low-role user's password will get 403s on most abilities)
 2. Scroll to **Application Passwords**, enter a name (e.g. `formidable-mcp`), click **Add New Application Password**
 3. Copy the generated password immediately (shown once)
-4. Paste it straight into `skills/formidable-mcp/scripts/frm-mcp.env` (copied from `frm-mcp.env.example`) as `APPLICATION_PASSWORD`, alongside `SITE_URL` and `WP_USERNAME`. Spaces in the password are fine — keep the quotes. Nothing else needs to see this value; it should not be pasted into a chat, a command, or a shell export.
+4. Paste it straight into `~/.config/formidable-mcp/frm-mcp.env` (copied from `frm-mcp.env.example`) as `APPLICATION_PASSWORD`, alongside `SITE_URL` and `WP_USERNAME`. Spaces in the password are fine — keep the quotes. Nothing else needs to see this value; it should not be pasted into a chat, a command, or a shell export.
 
 Requirements & hosting gotchas:
 
 - **WordPress requires HTTPS** for application passwords by default (local `.local`/`.test` environments are exempted as "local"). If the Application Passwords section is missing from the profile screen, the site is plain HTTP on a non-local host.
 - **Self-signed certs** (Local by Flywheel, Laravel Valet, DDEV, etc.): trust the environment's local CA rather than disabling verification — Local has "Trust" beside the site's SSL entry, Valet has `valet trust`, DDEV has `mkcert -install`. Failing that, point curl at the certificate with `--cacert /path/to/local-ca.pem`. Reach for `-k` only as a temporary local workaround, never against a remote site.
 - **Some hosts strip the `Authorization` header** before it reaches PHP (common on Apache CGI/FastCGI). Symptom: valid credentials always return `401`/`rest_not_logged_in`. Fix in `.htaccess`: `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1` (or `CGIPassAuth On` on Apache 2.4.13+).
-- The MCP endpoint is served by the Formidable API add-on's MCP adapter — if `/wp-json/mcp/formidable-mcp` 404s, confirm that plugin is active and permalinks aren't set to "Plain".
+- The MCP adapter ships with Formidable Lite and runs only while **Formidable → Settings → MCP → Enable the Formidable MCP server** is on; it needs WordPress 7.0+ (the Abilities API) and PHP 7.4+. Formidable versions without that settings section get the adapter from the Formidable Forms API add-on instead. If `/wp-json/mcp/formidable-mcp` 404s, check the toggle (the screen says why the server isn't running when something blocks it) and that permalinks aren't set to "Plain".
 
 ### Step 1 — Point the helper at the site (once per machine)
 
-Copy `scripts/frm-mcp.env.example` to `scripts/frm-mcp.env` and fill in `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD`. That is the whole connection setup — see "Connecting" above for why the values belong in the file and nowhere else.
+Put a downloaded `frm-mcp.env` at `~/.config/formidable-mcp/frm-mcp.env` (§ "Moving a downloaded file into place"), or copy `scripts/frm-mcp.env.example` there and fill in `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD`. That is the whole connection setup — see "Connecting" above for why the values belong in the file and nowhere else.
 
 ### Step 2 — Make calls through the bundled helper
 
@@ -149,7 +186,7 @@ Sessions expire after inactivity, and hand-rolling every curl call is error-pron
 ./scripts/frm-mcp formidable-forms/create-entry '{"form_id": "123", "456": "value"}'
 ```
 
-The helper reads `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD` from `frm-mcp.env` (env vars of the same names override it, which is for CI and scripted use — don't put a real password in a command prefix). Secrets never appear on the command line, so they never show in permission prompts either. If your client gates shell commands behind per-call approval — Claude Code, for example — prefix-based allow rules pair well with this: permanently allow read-only calls (`frm-mcp formidable-forms/list-*`, `get-*`) while `create-*`/`update-*`/`delete-*` keep prompting.
+The helper reads `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD` from `frm-mcp.env` (env vars of the same names override it, which is for CI and scripted use — don't put a real password in a command prefix). Secrets never appear on the command line, so they never show in permission prompts either. If your client gates shell commands behind per-call approval — Claude Code, for example — prefix-based allow rules pair well with this: permanently allow read-only calls (`frm-mcp formidable-forms/list-*`, `get-*`) while `create-*`/`update-*`/`delete-*` keep prompting. In Codex the default sandbox blocks network access, so `frm-mcp` has to run outside it — see `getting-started.md` § "Running `frm-mcp` from inside Codex".
 
 ### Under the hood — the session protocol
 
@@ -235,6 +272,7 @@ The MCP server exposes three generic tools; all Formidable operations go through
 Lists all registered WordPress abilities.
 - **Input:** empty object
 - **Output:** an object wrapping the list — `{"abilities": [{name, label, description}, …]}` — not a bare array
+- **Blocked for scoped passwords** from **Download frm-mcp.env** (`403 frm_mcp_skill_scope`) — use the stdio bridge or the catalog below with `get-ability-info` instead
 - Abilities from **other plugins** appear here too (a site with WP Mail SMTP returns `wp-mail-smtp/get-debug-events` alongside the Formidable ones). Filter on the `formidable-forms/` prefix rather than assuming everything returned belongs to Formidable
 
 ### 2. `mcp-adapter-get-ability-info`
@@ -288,7 +326,7 @@ All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` 
 ### Form Actions
 | Ability | Description | Notes |
 |---|---|---|
-| `list-form-actions` | List all post-submission actions for a form | readonly |
+| `list-form-actions` | List a form's post-submission actions — `form_id`, `type`, `post_status`, `page`, `page_size` | readonly; `page_size` capped at 200, default 200 |
 | `get-form-action` | Get single form action by id | readonly |
 | `create-form-action` | Create a form action (email, webhook, etc.) | not idempotent |
 | `update-form-action` | Update an existing form action | not idempotent |
@@ -313,11 +351,79 @@ All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` 
 | `list-application-items` | List all items in an application | readonly, idempotent |
 | `delete-application` | Delete an application (requires application_id) | destructive |
 
+### Coupons (requires the Formidable Coupons add-on)
+| Ability | Description | Notes |
+|---|---|---|
+| `list-coupons` | List coupons (id, name, code, amount, uses, dates, `allowed_form_ids`, computed status); supports paging, `order_by` (`id`/`name`/`date`/`modified`), `search` (name or code), `form_id` | readonly, idempotent |
+| `get-coupon` | Get one coupon — **`id` accepts the numeric ID or the coupon code** | readonly, idempotent |
+| `create-coupon` | Create a coupon; requires `name`, `code`, `amount`. **Also send `start` and `allowed_form_ids` or the coupon never applies** — see `coupons.md` and the active bug in `gotchas.md` | not idempotent |
+| `update-coupon` | Update a coupon by ID or code; only keys sent are changed. `code`/`amount` are frozen once the coupon has been used | not idempotent |
+| `delete-coupon` | Delete a coupon by ID or code; submitted entries keep their code | destructive |
+
+### Landing Pages (requires the Formidable Landing Pages add-on)
+| Ability | Description | Notes |
+|---|---|---|
+| `list-landing-pages` | List the site's landing pages (id, form_id/form_key, slug, url, status, enabled, content, layout, background); supports paging, `status`, `order` | readonly, idempotent |
+| `get-landing-page` | Get one by `form` (ID/key) or `id` (post ID); **404 when the form has none** — the way to ask whether a form has one | readonly, idempotent |
+| `save-landing-page` | **The write to use.** Upserts the one landing page for a `form` — creates or updates, never duplicates. Returns `created` and `form_embed_injected` | idempotent |
+| `update-landing-page` | Update by landing page `id`; cannot reassign the form. Prefer `save-landing-page` | not idempotent |
+| `delete-landing-page` | Delete by `form` or `id`; hard-deletes and clears the form's toggle. `force: false` trashes instead | destructive |
+
 ### Views (requires Formidable Views plugin)
 `list-views`, `get-view`, `create-view`, `update-view`, `delete-view`
 
 ### View Layouts (requires FrmAPIViewLayoutsController)
 `list-view-layouts`, `get-view-layout`, `create-view-layout`, `update-view-layout`, `delete-view-layout`
+
+### Payments (Lite core — always available, no add-on required)
+Read/manage transaction records from whichever gateway add-on (Stripe/Square/PayPal) processed them. **No create/edit** — a payment is created by the gateway's own checkout flow, never via MCP. Full treatment — payment fields, gateway actions, and these records — is in `payments.md`.
+
+| Ability | Description | Notes |
+|---|---|---|
+| `list-payments` | List payments — `form_id`, `status`, `page`, `page_size`, `order_by`, `order` | readonly, idempotent |
+| `get-payment` | Get one payment by `id` | readonly |
+| `delete-payment` | Delete a payment record | destructive |
+| `refund-payment` | Refund a payment through its original gateway (dispatches on the payment's `paysys`: `stripe`/`square`/`paypal`) | destructive, not idempotent |
+
+Payment object fields: `id`, `item_id`, `action_id`, `receipt_id`, `invoice_id`, `sub_id`, `amount`, `status`, `paysys`, `begin_date`, `expire_date`, `created_at`, `test`.
+
+### Subscriptions (Lite core — always available, no add-on required)
+Same shape as Payments, for recurring subscriptions. **No create/edit.**
+
+| Ability | Description | Notes |
+|---|---|---|
+| `list-subscriptions` | List subscriptions — `form_id`, `status`, `page`, `page_size`, `order_by`, `order` | readonly, idempotent |
+| `get-subscription` | Get one subscription by `id` | readonly |
+| `delete-subscription` | Delete a subscription record | destructive |
+| `cancel-subscription` | Cancel a subscription through its original gateway (dispatches on `paysys`) | destructive, not idempotent |
+
+Subscription object fields: `id`, `item_id`, `action_id`, `sub_id`, `amount`, `first_amount`, `interval_count`, `time_interval`, `fail_count`, `end_count`, `next_bill_date`, `status`, `paysys`, `created_at`, `test`.
+
+### Logs (requires the Logs add-on)
+List, read, and delete debug logs. **No create/update** — logs are written by Formidable's own operation (webhook failures, add-on activity), never via MCP.
+
+| Ability | Description | Notes |
+|---|---|---|
+| `list-logs` | List logs — `form_id`, `search`, `page`, `page_size`, `order` | readonly, idempotent |
+| `get-log` | Get one log entry by `id`, including its custom fields/context | readonly |
+| `delete-log` | Permanently delete a single log entry (bypasses trash) | destructive |
+
+### Translations (requires the WPML compatibility add-on, with WPML itself active)
+List and manage translations for every normally-translatable string in a form (labels, descriptions, choices, validation messages — form-level and field-level), backed by WPML's own String Translation tables. Full treatment is in `translations.md`.
+
+| Ability | Description | Notes |
+|---|---|---|
+| `list-translatable-strings` | List every translatable string for a form — requires `form_id`, optional `search` | readonly, idempotent |
+| `get-translation` | Get one string's translation in a given language — requires `string_id` + `language` | readonly |
+| `create-translation` | Add a translation for a `string_id` + `language`; **errors if one already exists** (use `update-translation` instead) | not idempotent |
+| `update-translation` | Update an existing translation for a `string_id` + `language`; **errors if none exists** (use `create-translation` instead) | not idempotent |
+| `delete-translation` | Delete a single translation row by `translation_id` — deletes only that language's translation, not the source string or its other translations | destructive |
+
+Two different IDs are in play here, and mixing them up is the most likely mistake:
+- **`string_id`** — the id of the *source string* (a row in WPML's `icl_strings`), returned by `list-translatable-strings` as each item's `id`. Used by `get-translation`, `create-translation`, `update-translation`.
+- **`translation_id`** — the id of one *specific translation* (a row in WPML's `icl_string_translations`), returned by `get-translation`/`create-translation`/`update-translation` as `translation_id` in their response. Used only by `delete-translation`. There is no bulk "delete all translations of this string" ability — that would require unregistering the source string entirely, which this ability set intentionally does not expose.
+
+Typical sequence: `list-translatable-strings` (form_id) → pick a `string_id` → `get-translation` (string_id + language) to see the current value → `create-translation` or `update-translation` depending on whether one already exists → `delete-translation` (translation_id) if it needs removing later.
 
 ### Implementation details
 - Each ability has an `input_schema`, `output_schema`, `execute_callback`, and `permission_callback`
@@ -365,11 +471,15 @@ Two verified behaviors of inline `fields[]`:
 ### list-entries parameters
 - `form_id`: filter by form
 - `page`: pagination (default: 1)
-- `page_size`: results per page
+- `page_size`: results per page, **capped at 200** (see note below)
 - `order_by`: sort field
 - `search`: search query
 - `start_date` / `end_date`: date range filtering
 - `is_draft`: 0 = submitted only, 1 = drafts only; **drafts are included when omitted**
+
+### The 200-per-page cap
+
+Every paginated `list-*` ability caps `page_size` at 200 per call — `list-entries`, `list-forms`, `list-payments`, `list-subscriptions`, and `list-form-actions` all clamp a requested `page_size` down to 200 (silently, not an error) and default to 200 or less if `page_size` is omitted. To read more than 200 rows total, increment `page` and keep calling rather than requesting a bigger `page_size`. Only `list-entries`/`list-payments`/`list-subscriptions` describe the cap in their own schema text; `list-forms` and `list-form-actions` enforce it just as strictly even though older tool descriptions may not spell it out — don't assume an uncapped result set from any `list-*` ability without checking whether you actually got everything (compare the row count returned against what you expected, or keep paging until a page comes back short).
 
 ## Field types reference
 
@@ -634,8 +744,8 @@ All ability responses follow this pattern:
 **Cause:** Session ID is invalid or expired (sessions expire after inactivity — this WILL happen during long working sessions).
 **Fix:** Re-initialize to get a fresh session ID. Better: use the Step 3 helper script, which detects this and re-initializes + retries automatically.
 
-### 401 / `rest_not_logged_in` despite correct credentials
-**Cause:** The host strips the `Authorization` header before PHP sees it (common on Apache CGI/FastCGI and some shared hosts), or the application password was created for a non-admin user, or application passwords are unavailable because the site is plain HTTP on a non-local domain.
+### 401 / `rest_not_logged_in` / `rest_forbidden` despite correct credentials
+**Cause:** The password was revoked (check **Manage connection files** for a downloaded one), the host strips the `Authorization` header before PHP sees it (common on Apache CGI/FastCGI and some shared hosts), or the application password was created for a non-admin user, or application passwords are unavailable because the site is plain HTTP on a non-local domain.
 **Fix:** Add `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1` to `.htaccess` (or `CGIPassAuth On`); use an administrator's application password; serve the site over HTTPS.
 
 ### curl: SSL certificate problem (self-signed)
@@ -643,8 +753,12 @@ All ability responses follow this pattern:
 **Fix:** Trust the environment's local CA — Local by Flywheel has a "Trust" button next to the site's SSL certificate, Valet has `valet trust`, DDEV has `mkcert -install`. Once trusted, curl verifies normally and nothing needs to change per call. If you can't trust the CA, pass `--cacert /path/to/local-ca.pem`. Disabling verification with `-k` is a last-resort local workaround: it silently accepts any certificate, so never use it against a remote or production site. The bundled `scripts/frm-mcp` gates it behind `FRM_MCP_INSECURE=1` for exactly this reason.
 
 ### 404 on `/wp-json/mcp/formidable-mcp`
-**Cause:** The Formidable API add-on (which ships the MCP adapter) isn't active, or permalinks are set to "Plain".
-**Fix:** Activate the add-on; set permalinks to any non-Plain structure.
+**Cause:** The MCP server is off or can't run, or permalinks are set to "Plain".
+**Fix:** Formidable → Settings → MCP → turn on **Enable the Formidable MCP server**; if it's on, that screen names what blocks it (WordPress 7.0+, PHP 7.4+). On Formidable versions without that section, activate the Formidable Forms API add-on. Set permalinks to any non-Plain structure.
+
+### 403 `frm_mcp_skill_scope`
+**Cause:** A password from **Download frm-mcp.env** was used for something outside its scope — a REST route other than the MCP endpoint, `mcp-adapter-discover-abilities`, or a non-Formidable ability. See § "Scoped connection-file passwords".
+**Fix:** Stay on `execute-ability` / `get-ability-info` with `formidable-forms/*` abilities. Never "fix" this by switching to the REST API or an unscoped password.
 
 ### "Ability 'formidable-forms/xyz' has invalid input"
 **Cause:** Required parameter missing or wrong format.
