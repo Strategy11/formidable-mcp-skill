@@ -5,13 +5,13 @@ description: Create, query, and manage everything in Formidable Forms via MCP �
 
 ## Overview
 
-This skill covers all Formidable Forms work through the Formidable MCP adapter. It is self-contained and portable: everything needed to do the work correctly is in this file and the `references/` directory. Site-specific access details (credentials, URLs, local paths) intentionally live outside this skill — they belong in a local `scripts/frm-mcp.env` file, so the skill stays portable across sites.
+This skill covers all Formidable Forms work through the Formidable MCP adapter. It is self-contained and portable: everything needed to do the work correctly is in this file and the `references/` directory. Site-specific access details (credentials, URLs, local paths) intentionally live outside this skill — they belong in a local `frm-mcp.env` file, normally `~/.config/formidable-mcp/frm-mcp.env`, so the skill stays portable across sites and survives plugin updates.
 
 ## Not connected yet? Start here
 
-If the site has never been connected from this machine — no `scripts/frm-mcp.env`, no working MCP tool, or the first call fails on auth — **read `references/getting-started.md` and walk the user through it.** It is a four-step setup with the exact commands to run, and `scripts/frm-mcp-setup` diagnoses each step automatically.
+If the site has never been connected from this machine — no `frm-mcp.env`, no working MCP tool, or the first call fails on auth — **read `references/getting-started.md` and walk the user through it.** The usual route is two steps in WP Admin → Formidable → Settings → MCP: **Download frm-mcp.env**, then **Copy setup prompt** into the assistant. If the user pastes that prompt (it asks you to install the skill, move the newest `frm-mcp*.env` from Downloads, and run `frm-mcp-setup`), follow `references/getting-started.md` § "The two-step setup". `scripts/frm-mcp-setup` diagnoses each step automatically.
 
-**Never ask the user for credentials.** Not in chat, not as a command to run, not "just paste it and I'll write the file". The application password goes from WP Admin straight into `frm-mcp.env`, typed by the user in an editor; you only ever confirm the file exists and run calls that read it. A password pasted into a conversation is in the transcript and must be rotated — so don't create that situation. Full reasoning in `references/mcp-protocol.md` § "Connecting".
+**Never ask the user for credentials.** Not in chat, not as a command to run, not "just paste it and I'll write the file". The application password reaches the machine as a file — downloaded from Formidable's settings, or typed into `frm-mcp.env` by the user. You may `mv` a downloaded file into place, but never open, `cat`, or quote it; otherwise you only confirm the file exists and run calls that read it. A password pasted into a conversation is in the transcript and must be rotated — so don't create that situation. Full reasoning in `references/mcp-protocol.md` § "Connecting".
 
 ## Routing: which reference to read
 

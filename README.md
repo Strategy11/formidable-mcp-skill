@@ -10,7 +10,7 @@ relevant reference file before making MCP calls, so it gets the call right the f
 
 ## Requirements
 
-- WordPress with **Formidable Forms** and the Formidable MCP adapter available
+- WordPress 7.0+ with **Formidable Forms**, its MCP server turned on (Formidable → Settings → MCP), and PHP 7.4+
 - An MCP connection to that site — either the WP-CLI stdio bridge (server shell access, no password) or the
   HTTP endpoint with an application password. Setup for both is in
   [`skills/formidable-mcp/references/getting-started.md`](skills/formidable-mcp/references/getting-started.md),
@@ -65,35 +65,38 @@ tabled in [`references/mcp-protocol.md`](skills/formidable-mcp/references/mcp-pr
 
 ## Quickstart: connect a site
 
-Three commands and one edit. Full walkthrough — including the no-password option for local sites — is in
+Two steps in WordPress. In WP Admin → **Formidable → Settings → MCP**:
+
+1. Turn on **Enable the Formidable MCP server** and click **Download frm-mcp.env**. Each download creates a new
+   application password that only works on the Formidable MCP endpoint.
+2. Pick Claude Code or Codex, click **Copy setup prompt**, and paste it into your agent. It installs the skill,
+   moves the downloaded file into place without opening it, and runs `frm-mcp-setup` to check the connection.
+
+The MCP server ships with Formidable and needs WordPress 7.0+ and PHP 7.4+. Full walkthrough — including the
+no-password option for local sites and the manual route for older Formidable versions — is in
 [`skills/formidable-mcp/references/getting-started.md`](skills/formidable-mcp/references/getting-started.md).
 
+To do step 2 yourself instead:
+
 ```bash
-cd skills/formidable-mcp/scripts    # plugin install? see below, or: find ~ -name frm-mcp-setup 2>/dev/null
-cp frm-mcp.env.example frm-mcp.env  # then edit it — see below
-./frm-mcp-setup                     # checks everything and says what's left to fix
+mkdir -p ~/.config/formidable-mcp
+mv "$(ls -t ~/Downloads/frm-mcp*.env | head -1)" ~/.config/formidable-mcp/frm-mcp.env
+chmod 600 ~/.config/formidable-mcp/frm-mcp.env
+skills/formidable-mcp/scripts/frm-mcp-setup     # plugin install? the scripts are in the plugin cache, see below
 ```
 
-With a plugin install the scripts are in the agent's plugin cache —
+`~/.config/formidable-mcp/` is where the helpers look by default, and unlike the skill's own directory it
+survives plugin updates. With a plugin install the scripts themselves are in the agent's plugin cache —
 `~/.claude/plugins/cache/formidable/formidable-mcp/<version>/skills/formidable-mcp/scripts/` for Claude Code,
 `~/.codex/plugins/cache/formidable/formidable-mcp/<version>/skills/formidable-mcp/scripts/` for Codex.
 
-Fill `frm-mcp.env` in with your own editor:
-
-```bash
-SITE_URL="https://example.com"
-WP_USERNAME="your-wp-username"
-APPLICATION_PASSWORD="xxxx xxxx xxxx xxxx xxxx xxxx"
-```
-
-The application password comes from WP Admin → **Users → Profile → Application Passwords** on an
-administrator account (it is not the login password; spaces in it are fine). `frm-mcp.env` is gitignored, and
-`frm-mcp-setup` never prints its values.
+Revoke a file under **Manage connection files** on the same settings screen; each one stays valid until
+revoked, including after Formidable is deactivated.
 
 **Don't paste credentials into a chat with an AI assistant** — anything in a conversation is in the
-transcript and would need rotating afterward. The skill instructs the agent never to ask for them: it points you
-at this file and reads the output of `frm-mcp-setup` instead. If you do have shell access to the WordPress
-host, the WP-CLI bridge needs no password at all.
+transcript and would need rotating afterward. The skill instructs the agent never to ask for them: it moves
+the downloaded file without reading it, and reads the output of `frm-mcp-setup` instead. If you do have shell
+access to the WordPress host, the WP-CLI bridge needs no password at all.
 
 `./frm-mcp-setup` verifies local tooling, the config file, TLS, the MCP endpoint, authentication, and the
 abilities themselves, printing a specific fix for whatever fails. When it ends in `Connected.`, try a call:
@@ -152,8 +155,10 @@ so **point it at a development site, not production**. It reads the same `frm-mc
 ## Configuration
 
 The `frm-mcp` helper and the smoke test read `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD` from a
-`frm-mcp.env` file next to the script (copy `frm-mcp.env.example` to start); environment variables of the
-same names override it, which is meant for CI rather than for typing a password into a command. The file is
+`frm-mcp.env` file — `$FRM_MCP_ENV` if set, else one next to the script, else
+`~/.config/formidable-mcp/frm-mcp.env`. Download it from Formidable's MCP settings, or copy
+`frm-mcp.env.example` and fill it in on older versions. Environment variables of the same names override it,
+which is meant for CI rather than for typing a password into a command. Beside the scripts the file is
 gitignored — keep credentials out of version control, out of chat transcripts, and out of shell history, and
 use a WordPress [application password](https://wordpress.org/documentation/article/application-passwords/)
 rather than an account password.
