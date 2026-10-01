@@ -5,14 +5,14 @@ Read this when: you need to connect to, configure, or call the Formidable Forms 
 ## Access policy (mandatory)
 
 - **Use the Formidable MCP exclusively for ALL operations** — creates, updates, deletes, and normal reads. **Never fall back to the Formidable REST API** (`/wp-json/frm/v3/` current or `/wp-json/frm/v2/` legacy endpoints). MCP is the intended abstraction layer; REST fallbacks circumvent its validation and permission model.
-- Recommended: enforce this in your project by **deny-listing** the REST endpoints wherever your client configures command permissions (`.claude/settings.json` in Claude Code; other clients have an equivalent allow/deny list), leaving only the MCP endpoint reachable by curl:
+- If your client supports command deny rules, use them to block direct Formidable REST requests. For example, Claude Code can put rules like these in `.claude/settings.json`:
   ```json
   "deny": [
     "Bash(curl * /wp-json/frm*)",
     "Bash(curl * /wp-json/)"
   ]
   ```
-  With those rules in place, any attempt to curl other `/wp-json/` routes is blocked by the permission system.
+  This is Claude Code permission syntax, not Codex configuration. In every client, follow the MCP-only rule above regardless of whether equivalent command rules are available.
 - **Never write to the database directly.** MCP abilities handle validation, serialization, and cache clearing; raw writes bypass all three. When an MCP call fails, investigate the error rather than working around it.
 - If an MCP tool isn't exposing its abilities, **diagnose the MCP configuration** rather than routing around it (don't install packages manually, don't switch to REST, don't script direct DB writes). Workarounds mask the real problem and don't persist to future sessions.
 - For verifying WordPress admin state programmatically, prefer MCP abilities (`list-forms`, `get-form`, etc.) over browser-based admin-page authentication — MCP bypasses the login redirect entirely.
@@ -32,7 +32,7 @@ Read this when: you need to connect to, configure, or call the Formidable Forms 
 Before the first call, the site URL and credentials must be somewhere the tooling can read them. **The recommended setup is a `frm-mcp.env` file next to `scripts/frm-mcp`**, created by the site owner in an editor:
 
 ```bash
-cd skills/formidable-mcp/scripts
+cd /absolute/path/to/your/skills/formidable-mcp/scripts
 cp frm-mcp.env.example frm-mcp.env
 # then edit frm-mcp.env and fill in SITE_URL, WP_USERNAME, APPLICATION_PASSWORD
 ```
@@ -62,7 +62,7 @@ Run the adapter as a local stdio MCP server through WP-CLI — no HTTP auth or s
 
 ### MCP client config
 
-Any MCP client that can launch a stdio server works. The server definition itself is identical everywhere — only the file it lives in, and the key it nests under, differ by client:
+Any MCP client that can launch a stdio server works. The `wp` command and arguments are the same; the configuration format differs by client. For clients using JSON with an `mcpServers` key:
 
 ```json
 {
@@ -83,15 +83,26 @@ Any MCP client that can launch a stdio server works. The server definition itsel
 }
 ```
 
+Codex uses TOML instead — `~/.codex/config.toml`, or `.codex/config.toml` in a trusted project (or run `codex mcp add formidable -- wp --path=... mcp-adapter serve --server=formidable-mcp --user=1`):
+
+```toml
+[mcp_servers.formidable]
+command = "wp"
+args = ["--path=/absolute/path/to/wordpress", "mcp-adapter", "serve", "--server=formidable-mcp", "--user=1"]
+```
+
+Check the connection with `codex mcp list`, or `/mcp` inside a session.
+
 | Client | Config file | Wrapper key |
 |---|---|---|
-| Claude Code | `.mcp.json` in the project root (or add it with `claude mcp add`) | `mcpServers` |
+| Claude Code | `.mcp.json` in the project root (or add it with `claude mcp add --scope project`) | `mcpServers` |
 | Claude Desktop | `claude_desktop_config.json` — macOS `~/Library/Application Support/Claude/`, Windows `%APPDATA%\Claude\` | `mcpServers` |
+| Codex | `~/.codex/config.toml`, or `.codex/config.toml` in a trusted project (or add it with `codex mcp add`) | `[mcp_servers.formidable]` (TOML) |
 | Cursor | `.cursor/mcp.json` in the project, or `~/.cursor/mcp.json` globally | `mcpServers` |
 | VS Code (agent mode) | `.vscode/mcp.json` | `servers` |
 | Anything else | see that client's MCP documentation | usually `mcpServers` |
 
-Locations move between releases — if one doesn't match what you see, the client's own MCP docs are authoritative. After saving, restart or reload the client so it launches the server, then confirm it appears in the client's MCP server list (in Claude Code, `/mcp`).
+Locations move between releases — if one doesn't match what you see, the client's own MCP docs are authoritative. After saving, restart or reload the client so it launches the server, then confirm it appears in the client's MCP server list (`/mcp` in Claude Code or Codex; `codex mcp list` from a terminal).
 
 Key points:
 - `--path` — absolute path to the WordPress install root
@@ -127,7 +138,7 @@ printf '%s\n' \
 1. WP Admin → **Users → Profile** (of an **administrator** — the ability permission callbacks check real capabilities, so a low-role user's password will get 403s on most abilities)
 2. Scroll to **Application Passwords**, enter a name (e.g. `formidable-mcp`), click **Add New Application Password**
 3. Copy the generated password immediately (shown once)
-4. Paste it straight into `skills/formidable-mcp/scripts/frm-mcp.env` (copied from `frm-mcp.env.example`) as `APPLICATION_PASSWORD`, alongside `SITE_URL` and `WP_USERNAME`. Spaces in the password are fine — keep the quotes. Nothing else needs to see this value; it should not be pasted into a chat, a command, or a shell export.
+4. Paste it straight into the skill's `scripts/frm-mcp.env` (copied from `frm-mcp.env.example`) as `APPLICATION_PASSWORD`, alongside `SITE_URL` and `WP_USERNAME`. Spaces in the password are fine — keep the quotes. Nothing else needs to see this value; it should not be pasted into a chat, a command, or a shell export.
 
 Requirements & hosting gotchas:
 
@@ -149,7 +160,7 @@ Sessions expire after inactivity, and hand-rolling every curl call is error-pron
 ./scripts/frm-mcp formidable-forms/create-entry '{"form_id": "123", "456": "value"}'
 ```
 
-The helper reads `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD` from `frm-mcp.env` (env vars of the same names override it, which is for CI and scripted use — don't put a real password in a command prefix). Secrets never appear on the command line, so they never show in permission prompts either. If your client gates shell commands behind per-call approval — Claude Code, for example — prefix-based allow rules pair well with this: permanently allow read-only calls (`frm-mcp formidable-forms/list-*`, `get-*`) while `create-*`/`update-*`/`delete-*` keep prompting.
+The helper reads `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD` from `frm-mcp.env` (env vars of the same names override it, which is for CI and scripted use — don't put a real password in a command prefix). Secrets never appear on the command line, so they never show in permission prompts either. If your client gates shell commands behind per-call approval — Claude Code, for example — prefix-based allow rules pair well with this: permanently allow read-only calls (`frm-mcp formidable-forms/list-*`, `get-*`) while `create-*`/`update-*`/`delete-*` keep prompting. In Codex the default sandbox blocks network access, so `frm-mcp` has to run outside it — see `getting-started.md` § "Running `frm-mcp` from inside Codex".
 
 ### Under the hood — the session protocol
 

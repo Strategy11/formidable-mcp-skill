@@ -17,23 +17,48 @@ When both apply, prefer the WP-CLI bridge: no credential exists to leak.
 
 ### 1. Install the skill
 
-In Claude Code, as a plugin:
+**Claude Code** — as a plugin:
 
 ```
 /plugin marketplace add Strategy11/formidable-mcp-skill
 /plugin install formidable-mcp@formidable
 ```
 
-Anywhere else — a personal or project skills directory, or another agent entirely — clone it and put the skill directory where your tool looks for skills or instructions:
+**Codex** — as a plugin, from the same repository (Codex reads the same marketplace file):
 
 ```bash
-git clone https://github.com/Strategy11/formidable-mcp-skill.git
-cp -r formidable-mcp-skill/skills/formidable-mcp ~/.claude/skills/    # or your agent's equivalent
+codex plugin marketplace add Strategy11/formidable-mcp-skill
+codex plugin add formidable-mcp@formidable
 ```
+
+Start a new session afterward so the skill is picked up.
+
+**Without a plugin system** — clone the repository and link the skill directory into the folder your agent scans for skills:
+
+| Agent | Just you, every project | One project (run from its root) |
+|---|---|---|
+| Claude Code | `~/.claude/skills/` | `.claude/skills/` |
+| Codex | `~/.agents/skills/` | `.agents/skills/` |
+
+```bash
+git clone https://github.com/Strategy11/formidable-mcp-skill.git ~/formidable-mcp-skill
+mkdir -p ~/.claude/skills    # or ~/.agents/skills, .claude/skills, .agents/skills
+ln -s ~/formidable-mcp-skill/skills/formidable-mcp ~/.claude/skills/formidable-mcp
+```
+
+A symlink keeps the skill current with `git pull`; copying the directory works too. Link it into both folders to use it from both agents. Other agents take the same directory wherever they look for skills or instructions.
 
 Nothing here is tied to a particular assistant: the references are plain Markdown and the helpers are POSIX shell scripts that only need `curl` and `jq`. An agent that can read files and run commands can use this; a person with a terminal can too.
 
-However it got installed, the helper scripts live in the skill's `scripts/` directory. If you're not sure where that ended up:
+However it got installed, the helper scripts live in the skill's `scripts/` directory:
+
+| Installed as | `scripts/` is at |
+|---|---|
+| Claude Code plugin | `~/.claude/plugins/cache/formidable/formidable-mcp/<version>/skills/formidable-mcp/scripts/` |
+| Codex plugin | `~/.codex/plugins/cache/formidable/formidable-mcp/<version>/skills/formidable-mcp/scripts/` |
+| Clone + link | `skills/formidable-mcp/scripts/` inside the clone |
+
+If you're still not sure:
 
 ```bash
 find ~ -name frm-mcp-setup -not -path '*/.git/*' 2>/dev/null
@@ -103,9 +128,15 @@ From here on, plain language is enough — the skill routes itself:
 
 > Build me a job application form with name, email, résumé upload, and a repeatable "previous employers" section, then create a view listing submissions by date.
 
+### Running `frm-mcp` from inside Codex
+
+Codex runs shell commands in a sandbox that, by default, has no network access and can only write inside the workspace. `frm-mcp` needs both — it calls the site, and it saves a session file next to itself, which for a plugin install is under `~/.codex/`. So the first call from Codex fails with `curl: (7) Failed to connect` until it runs outside the sandbox: approve that when Codex asks. Claude Code has no equivalent restriction by default; it just asks for permission to run the command. The stdio bridge below avoids the question entirely, since MCP servers aren't run through the shell sandbox.
+
 ## Local sites: the WP-CLI bridge (no password at all)
 
-If you have a shell on the machine hosting WordPress, skip application passwords entirely and run the adapter as a stdio MCP server. Add this to your MCP client's config file:
+If you have a shell on the machine hosting WordPress, skip application passwords entirely and run the adapter as a stdio MCP server. The `wp` command and arguments are the same for every client; only the config format differs.
+
+**Claude Code** — `.mcp.json` in the project root (Claude Desktop takes the same JSON in `claude_desktop_config.json`):
 
 ```json
 {
@@ -120,9 +151,17 @@ If you have a shell on the machine hosting WordPress, skip application passwords
 }
 ```
 
-The server definition is the same for every client; where it goes is not — `.mcp.json` in the project root for Claude Code, `claude_desktop_config.json` for Claude Desktop, `.cursor/mcp.json` for Cursor, `.vscode/mcp.json` for VS Code agent mode (which nests under `servers` rather than `mcpServers`). Check your client's MCP docs if none of those match.
+**Codex** — `~/.codex/config.toml`, or `.codex/config.toml` in a trusted project:
 
-Then reload or restart the client so it launches the server, and confirm `formidable` shows up in its MCP server list — in Claude Code that's `/mcp`; other clients have an equivalent panel or status indicator.
+```toml
+[mcp_servers.formidable]
+command = "wp"
+args = ["--path=/absolute/path/to/wordpress", "mcp-adapter", "serve", "--server=formidable-mcp", "--user=1"]
+```
+
+Either client can also write that entry for you: `claude mcp add --scope project formidable -- wp --path=... mcp-adapter serve --server=formidable-mcp --user=1`, or the same arguments after `codex mcp add formidable --`.
+
+Then start a new session so the client launches the server, and confirm `formidable` is listed: `/mcp` in either client, or `codex mcp list` from a terminal. Other clients (Cursor, VS Code) are in `mcp-protocol.md` § "Transport 1".
 
 Use the full path to the `wp` binary if it isn't on PATH. `--user=1` is the WordPress user ID to act as — it must be an administrator. Full details, including the per-client config table, are in `mcp-protocol.md` § "Transport 1".
 
@@ -153,6 +192,7 @@ If the user pastes a credential anyway: don't repeat it back, and tell them to r
 | `401` / `rest_not_logged_in` | Wrong or revoked password, non-admin user, or the host strips the `Authorization` header | New application password; use an admin; `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1` in `.htaccess` |
 | `curl: (60) SSL certificate problem` | Local dev self-signed certificate | Trust the environment's CA (Local's "Trust" button, `valet trust`, `mkcert -install`) or set `FRM_MCP_CACERT` in `frm-mcp.env` |
 | `Session not found` / `Missing Mcp-Session-Id` | Session expired mid-run | Nothing — `frm-mcp` re-initializes and retries automatically |
+| `curl: (7) Failed to connect` from Codex, but `./frm-mcp-setup` works in a terminal | Codex's sandbox blocks network by default | Approve running the command outside the sandbox — see § "Running `frm-mcp` from inside Codex" |
 | Views calls fail, forms calls work | Formidable Views not active (Pro) | Expected on Lite; forms, fields, and entries still work |
 
 Deeper causes and the full error catalogue are in `mcp-protocol.md` § "Common errors and solutions"; adapter bugs and their workarounds are in `gotchas.md`.
