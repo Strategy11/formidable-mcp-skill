@@ -8,8 +8,8 @@ The relationship is 1:1. That is why the write ability is an **upsert** rather t
 
 | Ability | Use |
 |---|---|
-| `list-landing-pages` | `page`, `page_size` (default 25), `status` (`publish`/`private`/`draft`), `order` |
-| `get-landing-page` | `form` (ID or key) **or** `id` (post ID). Returns 404 when the form has none — this is the way to ask "does this form have a landing page?" |
+| `list-landing-pages` | `page`, `page_size` (default 25), `status` (`publish`/`private`/`draft`/`trash`), `order`. Trashed pages are left out unless you ask for `status: trash` |
+| `get-landing-page` | `form` (ID or key) **or** `id` (post ID). Returns 404 when the form has none — this is the way to ask "does this form have a landing page?" A trashed page is still returned, with `status: trash` |
 | `save-landing-page` | **The write to use.** Requires `form`; creates when the form has none, updates when it has one. Never produces a second page. Idempotent — same input twice changes nothing |
 | `update-landing-page` | By landing page `id` only. Cannot move a page to a different form. Prefer `save-landing-page` unless you already hold the post ID |
 | `delete-landing-page` | `form` or `id`, plus `force` (default `true`) |
@@ -39,10 +39,11 @@ So the design settings are per-form, not per-post, and `update-landing-page` by 
 
 Landing pages are served **from the site root**, so the slug shares a namespace with every page and post on the site. Consequences:
 
-- A slug already in use, or a WordPress reserved word, is **rejected** with `frm_landing_slug_taken` — it does not get silently suffixed.
+- A slug already in use is **rejected** with `frm_landing_slug_taken` — it does not get silently suffixed.
+- A reserved slug is **rejected** with `frm_landing_slug_reserved`: anything starting with `wp-` (`wp-json`, `wp-admin`, `wp-login`, `wp-content`…), the REST prefix, `admin`, `login`, `dashboard`, `xmlrpc`, `feed`, `embed`, `trackback`, `robots`, `favicon`, and Formidable's reserved query vars. The settings screen's "URL is taken" check uses the same list. Extendable with the `frm_landing_reserved_slugs` filter.
 - Omitting `slug` derives one from the form name, falling back to `sanitize_title( $form->form_key )`. If nothing usable can be derived you get `frm_landing_invalid_slug` asking for an explicit slug.
 - Slugs are run through `sanitize_title()`, so send something already slug-shaped to avoid surprises.
-- `title` defaults to the form name, or to the slug when the form is unnamed.
+- `title` defaults to the form name, or to the slug when the form is unnamed. An explicit `title` that is empty after sanitizing (`""`, whitespace, markup only like `<b></b>`) is **rejected** with `frm_landing_invalid_title` on both create and update — omit `title` instead to keep the default or the current one.
 
 ## Content: the form embed is guaranteed
 
@@ -72,4 +73,13 @@ So to control where the form sits on the page, include the embed yourself at the
 
 This is **better behaved than the add-on's own delete button**, which only trashes the post and leaves the toggle on — so the next form-settings save regenerates a page. Prefer the ability.
 
-`force: false` trashes instead, and a trashed page **still counts as the form's landing page** — `save-landing-page` will update that trashed post rather than create a fresh one. Use `force: false` only when you intend to restore it.
+`force: false` moves the page to the trash (through `wp_trash_post()` — `wp_delete_post( $id, false )` only trashes posts and pages and hard-deletes every other post type, which is why this has to be explicit). The toggle is switched off either way. Trashing an already-trashed page succeeds as a no-op, so retries are safe.
+
+A trashed page **still counts as the form's landing page**:
+
+- `get-landing-page` finds it (`status: trash`), and `list-landing-pages` lists it under `status: trash`.
+- `save-landing-page` / `update-landing-page` **without** `status` or `enabled` is refused with `frm_landing_page_trashed` (409, carries `landing_page_id`) — it neither writes into the trash nor creates a second page.
+- Send a `status` (or `enabled`) to **restore** it: the same post ID comes back, with its original slug.
+- To start over with a fresh page instead, delete the trashed one with `force: true` first.
+
+Verified end to end: trash, refused save, restore with `status: publish` returned the same id and slug, `created: false`.

@@ -309,7 +309,7 @@ All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` 
 | Ability | Description | Notes |
 |---|---|---|
 | `list-entries` | List submissions; supports form_id, paging, order, search, start_date/end_date | readonly |
-| `get-entry` | Get one entry by id/item_key | readonly |
+| `get-entry` | Get one entry by id/item_key. Also returns spam entries (`is_draft: 4`, meta HTML-escaped) | readonly |
 | `create-entry` | Submit an entry; requires form_id + values keyed by field id/field_key | |
 | `update-entry` | Update an entry's values (item_meta) | |
 | `delete-entry` | Delete an entry | destructive |
@@ -405,8 +405,12 @@ List, read, and delete debug logs. **No create/update** — logs are written by 
 | Ability | Description | Notes |
 |---|---|---|
 | `list-logs` | List logs — `form_id`, `search`, `page`, `page_size`, `order` | readonly, idempotent |
-| `get-log` | Get one log entry by `id`, including its custom fields/context | readonly |
-| `delete-log` | Permanently delete a single log entry (bypasses trash) | destructive |
+| `get-log` | Get one log entry by `id`, with its content and every detail as separate fields | readonly |
+| `delete-log` | Permanently delete a single log entry (bypasses trash). Returns the log as it was, plus `deleted: true` | destructive |
+
+Log summary fields (`list-logs`): `id`, `title`, `entry_id`, `form_id`, `action` (the form action's **post ID**, not a type name; `0` when none), `code` (status code as a string, `""` when none), `date_created` (GMT).
+
+`get-log` / `delete-log` add `content` (the logged response body) and `fields`, an object keyed the way the admin Log Details screen labels rows: `frm_url`, `frm_request`, `frm_code`, `frm_message`, `frm_entry`, `frm_action`, `frm_form`, and any others the logger stored. The add-on stores all of these in one PHP-serialized `frm_custom_fields` meta row; the ability expands it, and JSON values (`frm_request`, `frm_message` for JSON APIs) come back as decoded objects, so there is nothing to unserialize or `json_decode` client-side. `frm_message` can be a full HTML page for webhooks that return one — expect large payloads.
 
 ### Translations (requires the WPML compatibility add-on, with WPML itself active)
 List and manage translations for every normally-translatable string in a form (labels, descriptions, choices, validation messages — form-level and field-level), backed by WPML's own String Translation tables. Full treatment is in `translations.md`.
@@ -475,7 +479,7 @@ Two verified behaviors of inline `fields[]`:
 - `order_by`: sort field
 - `search`: search query
 - `start_date` / `end_date`: date range filtering
-- `is_draft`: 0 = submitted only, 1 = drafts only; **drafts are included when omitted**
+- `is_draft`: 0 = submitted only, 1 = drafts only; **drafts are included when omitted**. Spam entries (status 4) are always left out, and no value lists them. See `entries-and-views.md` § "Spam entries"
 
 ### The 200-per-page cap
 

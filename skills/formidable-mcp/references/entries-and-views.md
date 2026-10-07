@@ -69,6 +69,17 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
 
 The response's `meta` object is keyed by **field_key**, not field ID (`"meta": {"9qiak": "Paris", ...}`) — even though `create-entry`/`update-entry` accept IDs. Map keys via `list-fields` before asserting on values. Some field types add derived companion metas: a `quiz_score` field stores its display value under its own key (`"fnzkj": "3/5"`) plus a numeric copy under `"<field_key>-value"` (`"fnzkj-value": "3"`) — use the `-value` meta (or `get-stats` on the field ID) for numeric comparisons.
 
+### Spam entries (`is_draft: 4`)
+
+Formidable versions with spam entries save a flagged submission as an entry with status `4` (stored in the `is_draft` column) instead of rejecting it, so an admin can review it in the **Spam** tab of the entries list. The submitter sees the normal success message. The other statuses are `0` submitted, `1` draft, and `2`/`3` in-progress/abandoned (Abandonment add-on).
+
+- **`list-entries` never returns spam**, and its `is_draft` filter only accepts `0` or `1` (`is_draft: 4` is rejected as invalid input). There is no MCP ability that lists spam entries. Review them in wp-admin (Entries → Spam tab), or by direct read-only database access when you have it.
+- **`get-entry` by ID or key does return a spam entry**, with `is_draft: 4`. Its `meta` values come back **HTML-escaped** (`&lt;b&gt;` rather than `<b>`), because every value of a spam entry is escaped on output. Don't compare them to the raw submitted text.
+- **Spam is excluded from views, counts and statistics** by default. `drafts="all"` on `[frm-stats]` and `[formresults]` is the explicit every-status option, and it includes spam.
+- **Form actions never run for a spam entry.** Emails and webhooks are skipped when it is saved. Marking an entry "Not spam" in wp-admin restores it, and can re-run the selected create actions. Marking or unmarking spam is a wp-admin action only. No MCP ability changes it.
+- **Why an entry was flagged** is in its `description` (`spam_source`, plus `spam_reason` for checks like CAPTCHA), shown as "Spam reason" in the entry sidebar. `get-entry` does not return `description`.
+- **A spam entry does not block a duplicate.** `create-entry`'s duplicate check ignores spam entries, so seeding values identical to a spam entry succeeds.
+
 ### List with Filters (Pagination and Sorting)
 
 `list-entries` accepts `per_page`, `page`, `sort_by`, `sort`, and `is_draft` (0 = submitted only, 1 = drafts only; drafts are included when omitted):
