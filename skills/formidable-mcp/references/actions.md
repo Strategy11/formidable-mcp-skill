@@ -287,7 +287,7 @@ foreach ( FrmFormActionsController::get_form_actions() as $slug => $a ) {
 }'
 ```
 
-Per-form limits matter: `wppost`, `register`, `quiz` and each payment type are `limit => 1` (one per form); `on_submit`, `email`, `gated_content`, `quiz_outcome` and `api` allow 99.
+Per-form limits matter: `wppost`, `register`, and `quiz` generally allow one action; `on_submit`, `email`, `gated_content`, `quiz_outcome`, and `api` allow 99. In the reviewed 7.0 Pro implementation, `stripe`, `square`, `paypal`, and `payment` also allow 99, enabling conditional gateway routing; Lite keeps its single gateway-action cap. See [payments.md](payments.md#registered-types-and-per-form-limits).
 
 ### Verified working payloads for add-on actions
 

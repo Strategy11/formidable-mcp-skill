@@ -6,52 +6,15 @@ Read this when: listing or counting forms, or creating or updating Formidable fo
 
 All operations go through the Formidable MCP adapter. Initialize a session first, then call abilities via `mcp-adapter-execute-ability`.
 
-**1. Initialize a session and capture the `mcp-session-id` response header:**
+Use the bundled helper for HTTP calls; it loads the connection file and manages sessions without putting credentials in commands. For example, from the skill directory:
 
 ```bash
-curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
-  -H "Content-Type: application/json" \
-  -u "USERNAME:APP_PASSWORD" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "initialize",
-    "params": {
-      "protocolVersion": "2025-11-25",
-      "capabilities": {},
-      "clientInfo": {"name": "claude", "version": "1.0"}
-    },
-    "id": 1
-  }' -i 2>&1 | grep -i "mcp-session-id" | head -1 | cut -d' ' -f2 | tr -d '\r'
+scripts/frm-mcp formidable-forms/create-form '{"name":"Contact Form","description":"A simple contact form"}'
 ```
 
-**2. Call abilities with the session ID:**
+Follow the local environment's canonical helper path when specified. For a connected native MCP client, use `mcp-adapter-execute-ability` with the same `ability_name` and `parameters`. See [mcp-protocol.md](mcp-protocol.md) for protocol details.
 
-```bash
-curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
-  -H "Content-Type: application/json" \
-  -H "Mcp-Session-Id: {SESSION_ID}" \
-  -u "USERNAME:APP_PASSWORD" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "mcp-adapter-execute-ability",
-      "arguments": {
-        "ability_name": "formidable-forms/create-form",
-        "parameters": {
-          "name": "Contact Form",
-          "description": "A simple contact form"
-        }
-      }
-    },
-    "id": 2
-  }' 2>&1 | jq '.result.structuredContent.data | {id, form_key, name}'
-```
-
-**Session management rules:**
-- Always initialize a session before making ability calls
-- Extract the `mcp-session-id` from the response header
-- Include it in all subsequent requests as the `Mcp-Session-Id` header
+**7.0 settings:** read [advanced-settings.md](advanced-settings.md) for submission quotas, GDPR/retention, linked image choices, subfield logic, ranges, and autocomplete.
 
 **Core abilities:**
 - `formidable-forms/create-form` — parameters: `name`, `description`, `status`, `logged_in`, `is_template`, `editable`, `fields` (array), `parent_form_id` (integer; persists the child→parent link, e.g. for repeater child forms), and `options` (object). **`options` is applied as the form is created** — `submit_value`, `ajax_submit`, `success_msg`, `success_action` and the rest all take effect in the one call, and any option left out is created with its default. No follow-up `update-form` is needed just to set form options.
@@ -296,7 +259,7 @@ If an option field displays generic labels like "Option 1", "Option 2" instead o
 1. Options are created without explicit label/value pairs
 2. Options are stored in `field_options` but the `options` column (which the form renderer uses) was never updated
 
-The MCP creates options in `field_options`, but the form renderer also checks the `options` column. Always verify that both columns contain the same values, or clear `options` entirely and rely only on `field_options`.
+MCP writes the top-level `options` to the field's choices column. Keep choices there; do not duplicate them into `field_options.options` or clear the real choices.
 
 ### Fixing Wrongly-Formatted Options
 
@@ -425,6 +388,24 @@ Note: passing "Other" as a regular array option (e.g. via a generic REST payload
 }
 ```
 
+### 7.0: placeholders for each Other input
+
+Set `field_options.other_placeholder` to an object keyed by the **same `other_…` option keys**, not a single string or an ordinary field placeholder:
+
+```json
+{
+  "id": 12918,
+  "field_options": {
+    "other": "1",
+    "other_placeholder": {"other_1": "Please specify your pet"}
+  }
+}
+```
+
+This updates an existing Other choice; it does not create one. Keep the keyed top-level `options` shown above. For multiple Other choices, pass the complete placeholder map: merging is shallow, so sending only `other_1` replaces any stored `other_2` placeholder. `other_placeholder: {}` clears all of them; an empty string for a key removes its displayed hint. Send plain strings under valid Other keys. The Pro builder sanitizes this map (strips HTML and discards non-Other keys and non-string/empty values); do not assume a standalone MCP write runs the same builder sanitization. A dropdown's shared Other text input uses the first Other option's placeholder.
+
+The new renderer requires matching Lite support and Pro; older Lite renders its own Other box without the Pro placeholder. Verify with `list-fields`, then select Other in the frontend and check the revealed input's `placeholder`, including saved/default write-in values. A placeholder is a hint, not a label or saved answer.
+
 ### Frontend HTML Structure (for verification)
 
 ```html
@@ -456,7 +437,7 @@ AI fields generate content using OpenAI/GPT based on input from other fields. Th
 
 ### Critical Rules
 
-- **Copy the full field_options structure from a reference AI field** and add your AI settings. AI fields have 70+ field_options keys inherited from the parent field type; missing keys cause settings to not persist or display in the form editor. Never create minimal field_options.
+- **7.0 seeds and merges field defaults.** Send the AI settings you need; do not copy another field's IDs, conditional logic, or unrelated settings. Inspect an existing AI field when you need the installed add-on's prompt/model schema.
 - **ai_question uses field ID shortcodes**: `[13086]` — NOT field keys like `[lwrli]` (this is different from view templates!)
 - **Save via MCP** — the abilities handle PHP serialization and cache clearing automatically
 - **API key required**: The site must have OpenAI/AI credentials configured in Formidable settings
@@ -472,7 +453,7 @@ AI fields generate content using OpenAI/GPT based on input from other fields. Th
 }
 ```
 
-2. **Read a reference AI field's full field_options** via MCP (`list-fields` on a form with an existing AI field — response `data` is an object keyed by field_key).
+2. **Inspect the created field and the installed AI add-on settings** via MCP; use an existing AI field only to clarify an unfamiliar schema.
 
 3. **Merge in the AI settings and save with `update-field`** (`field_options` persists correctly; serialization and cache clearing are automatic):
 
@@ -482,7 +463,6 @@ AI fields generate content using OpenAI/GPT based on input from other fields. Th
   "parameters": {
     "id": "{AI_FIELD_ID}",
     "field_options": {
-      "...": "full field_options copied from the reference AI field, plus:",
       "system": "You are a creative storyteller. Generate engaging stories.",
       "watch_ai": [13086, 13084, 13085],
       "ai_question": "Write a [13086] story featuring [13085] who is [13084].",
@@ -503,111 +483,11 @@ The question template can include field ID shortcodes, static text/formatting, a
 
 ### Known Failure Mode
 
-An AI field created without populated field_options shows the field label in the editor but blank AI settings (prompt, question, model). Fix: copy full field_options from an existing AI field, add the AI-specific settings, and save via `update-field` (cache clearing is automatic).
+If the AI settings are blank, read the field back and check the active add-on, supported settings, and credentials configuration. In 7.0, missing inherited defaults are not an expected consequence of a partial MCP payload. Save the needed AI settings with `update-field` and verify them.
 
 ## Repeatable Sections
 
-Formidable supports **two different repeater patterns**. Choose based on your needs.
-
-**CRITICAL RULE for both patterns: `form_select` on the divider must ALWAYS be set to a child form ID.** The plugin checks `if ( ! empty( $field['form_select'] ) )` to decide whether to display the repeater icon; if empty, it shows the header icon instead.
-
-### Pattern 1: Nested Forms Repeater (complex, reusable sub-forms)
-
-Fields live in a **child form**; the parent form has a `divider` with `"repeat":"1"` and `"form_select"` pointing to the child form, plus an `end_divider` that renders add/remove buttons.
-
-**Critical points:**
-- Repeater fields go ONLY in the child form, NOT the parent form
-- The parent form contains only: divider (with form_select), end_divider, and non-repeating fields
-- Child form fields MUST have complete `field_options` (71+ keys, copied from a template/existing field) — NOT minimal serialized options
-- End_dividers MUST have full field_options with `add_label`, `remove_label`, and repeater settings for buttons to render
-- **Expected behavior:** child form fields do NOT appear in the parent form's field editor — they appear only in the child form editor and on the frontend when the repeater renders. This is correct, not a bug.
-
-**Child form field configuration:**
-1. Set `in_section` in field_options to the parent divider field ID
-2. Copy FULL field_options from a template/existing field
-3. `field_order` can be non-sequential within the child form (e.g., 8, 10, 12)
-4. Preserve all field_options keys so the backend editor shows fields in the correct repeater sections
-
-**End_divider field_options must include:**
-- `"add_label": "Add"` — add button label
-- `"remove_label": "Remove"` — remove button label
-- `"minnum": 1` — minimum repeating rows
-- `"maxnum": 10` — maximum repeating rows
-- `"step": 1` — increment step
-- `"format": "both"` — display both add and remove buttons
-- Plus standard field_options (show_hide, blank validation, etc.)
-
-**Structure/workflow:**
-
-```bash
-# 1. Create child form WITH parent_form_id in one call (CRITICAL - makes fields
-#    display nested in parent editor; persisted directly by create-form)
-#    ability: formidable-forms/create-form  {"name": "Repeater Items", "parent_form_id": 1492}
-#    Result: child_form_id = 1495
-#
-#    For an EXISTING child form missing the link, use update-form instead:
-#    ability: formidable-forms/update-form  {"id": 1495, "parent_form_id": 1492}
-
-# 2. Add fields to the CHILD form (these repeat)
-#    Include in_section in field_options AND copy full field_options from a template:
-#    {"form_id": "1495", "type": "text", "name": "Item Name", "field_order": 8,
-#     "field_options": {<full template options with "in_section": <divider_id>>}}
-#    {"form_id": "1495", "type": "textarea", "name": "Description", "field_order": 10,
-#     "field_options": {<full template options with "in_section": <divider_id>>}}
-
-# 3. Create divider in PARENT form with form_select pointing to the child form
-#    {"form_id": "1492", "type": "divider", "name": "Items Section",
-#     "field_options": {"repeat": "1", "form_select": "1495"}, "field_order": 8}
-
-# 4. Create end_divider in PARENT form to close the repeater
-#    {"form_id": "1492", "type": "end_divider", "field_order": 9,
-#     "field_options": {<full template options with add_label/remove_label + repeater settings>}}
-```
-
-### Pattern 2: Direct Parent Repeater (simple field groups)
-
-Repeatable fields live directly in the **parent form** with `in_section` grouping. **Still create a child form**, but leave it empty — it exists only so `form_select` can reference it (required for the plugin to function and show the repeater icon).
-
-**Structure:**
-1. Create a child form (even though empty), passing `parent_form_id` (the parent form ID) directly to `create-form`
-2. Create a divider in the parent form with `"repeat":"1"` and `"form_select": <child_form_id>` (MUST be set!)
-3. Create repeater fields in the PARENT form with `in_section: <divider_id>` in field_options — any field type; keep field orders consecutive (no gaps)
-4. Create an end_divider in the parent form with `add_label`/`remove_label`
-
-**Example: Radio Options repeater with 4 radio fields**
-
-```bash
-# 1. Create child form (empty, just for form_select reference) WITH parent_form_id
-#    ability: formidable-forms/create-form  {"name": "Radio Options", "parent_form_id": 1492}
-#    Returns: child_form_id = 1505
-#    (For an existing child form: formidable-forms/update-form {"id": 1505, "parent_form_id": 1492})
-
-# 2. Divider with repeat + form_select (returns divider_id = 13020)
-#    {"form_id": "1492", "type": "divider", "name": "Radio Options",
-#     "field_options": {"repeat": "1", "form_select": "1505"}, "field_order": 54}
-
-# 3. Radio fields in PARENT form with in_section: 13020
-#    {"form_id": "1492", "type": "radio", "name": "1st Radio", "field_options": {"in_section": 13020}, "field_order": 56}
-#    {"form_id": "1492", "type": "radio", "name": "2nd Radio", "field_options": {"in_section": 13020}, "field_order": 58}
-#    {"form_id": "1492", "type": "radio", "name": "3rd Radio", "field_options": {"in_section": 13020}, "field_order": 60}
-#    {"form_id": "1492", "type": "radio", "name": "4th Radio", "field_options": {"in_section": 13020}, "field_order": 62}
-
-# 4. End_divider in parent form
-#    {"form_id": "1492", "type": "end_divider",
-#     "field_options": {"add_label": "Add", "remove_label": "Remove"}, "field_order": 64}
-```
-
-### Pattern Comparison
-
-| Aspect | Nested Forms | Direct Parent |
-|--------|--------------|---------------|
-| Requires child form | Yes | Yes |
-| Child form has fields | Yes | No (empty) |
-| Fields visible in parent editor | No (only in child) | Yes |
-| **form_select set?** | **Yes** | **Yes (REQUIRED!)** |
-| Reusable | Yes | No |
-| Complexity | Higher | Lower |
-| Best for | Complex, reusable structures | Simple field groups |
+Read [repeaters.md](repeaters.md) before creating or changing a repeatable section or embedded form. It contains the two supported architectures, numeric child/section links, entry row payloads, and ordering rules. In 7.0, Pro can create the child form automatically for a new repeater, and core MCP merges partial field settings with defaults. Verify the saved `form_select`, `parent_form_id`, `in_section`, and field order instead of copying a template's unrelated settings.
 
 ## Lookup Fields (Pro)
 
@@ -706,6 +586,8 @@ Fields compute values via the `calc` property in `field_options`.
 
 ## Conditional Logic
 
+For Name/Address subfield triggers such as `123_country`, read [advanced-settings.md](advanced-settings.md#composite-fields-and-conditional-logic).
+
 **Field-level** (show/hide fields based on other fields' values), in field_options:
 
 ```json
@@ -787,10 +669,9 @@ Key form-level settings (in form `<options>`):
 - `antispam` — "1" for honeypot protection
 - `on_submit_migrated` — "1" to use on_submit action (modern approach)
 - `custom_style` — Style key to apply to form
-- `single_entry_type` — ["user"] to limit one entry per user
+- `single_entry`, `single_entry_type`, `single_entry_limit`, `single_entry_interval`, `single_entry_interval_count` — Pro submission quotas; see `advanced-settings.md` for required enable flag, identities, and calendar semantics
 - `chat` — ["1"] for conversational (chat) forms
-- `logged_in` — "1" to require login
-- `editable` — "1" to allow users to edit their entry
+- `logged_in` and `editable` are top-level form properties at creation, not `options` keys. The reviewed `update-form` schema/executor does not expose updates to them; use the settings UI if needed rather than claiming an `options` write changes them.
 
 ## Layout & Composite Fields
 
@@ -855,7 +736,7 @@ Verified layout on a real form (rendered widths in a 580px content column):
 
 Reference: `https://formidableforms.com/knowledgebase/form-layout-and-css-classes/`.
 
-> **`field_options` merges on update** (verified): sending `{"field_options": {"classes": "frm6"}}` to `update-field` changes only `classes` and leaves the other keys intact — a text field kept all 17. That's the opposite of field *creation*, where partial `field_options` can corrupt rendering (see `repeaters.md`), so don't read the create-time warning as a reason to re-send every key on an update.
+> **`field_options` merges on update** (verified): sending `{"field_options": {"classes": "frm6"}}` to `update-field` changes only `classes` and leaves the other keys intact — a text field kept all 17. In 7.0 creation also merges with type defaults. Both merges are shallow: nested maps/arrays such as `other_placeholder` must be sent in full when preserving their other members.
 
 ## Formidable Applications (Pro)
 

@@ -71,6 +71,8 @@ The response's `meta` object is keyed by **field_key**, not field ID (`"meta": {
 
 ### Spam entries (`is_draft: 4`)
 
+Pro 7.0 also has global spam retention (default 30 days), separate from per-form GDPR entry auto-deletion. See [advanced-settings.md](advanced-settings.md#gdpr-agreement-and-automatic-entry-retention) before configuring or explaining cleanup.
+
 Formidable versions with spam entries save a flagged submission as an entry with status `4` (stored in the `is_draft` column) instead of rejecting it, so an admin can review it in the **Spam** tab of the entries list. The submitter sees the normal success message. The other statuses are `0` submitted, `1` draft, and `2`/`3` in-progress/abandoned (Abandonment add-on).
 
 - **`list-entries` never returns spam**, and its `is_draft` filter only accepts `0` or `1` (`is_draft: 4` is rejected as invalid input). There is no MCP ability that lists spam entries. Review them in wp-admin (Entries → Spam tab), or by direct read-only database access when you have it.

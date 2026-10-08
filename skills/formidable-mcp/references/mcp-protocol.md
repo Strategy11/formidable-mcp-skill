@@ -292,6 +292,10 @@ Execute an ability.
   }
   ```
 
+## 7.0 capability placement
+
+Core MCP no longer requires the API add-on. Lite supplies forms, fields, entry list/get/delete, form actions, payment/subscription management, and style list/get/update. Pro supplies entry create/update, stats, applications, and style create/delete/assignment. Other abilities depend on the relevant add-ons. New settings often live in existing `options`/`field_options` objects rather than new abilities; see [advanced-settings.md](advanced-settings.md). There is no reviewed global-settings ability. The reviewed `update-form` executor updates name/description/status/options/parent_form_id, but not the top-level `logged_in`/`editable` properties accepted at creation.
+
 ## Abilities catalog
 
 All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` inputs accept either a numeric ID or an alphanumeric key (`form_key`, `item_key`, `field_key`).
@@ -432,7 +436,7 @@ Typical sequence: `list-translatable-strings` (form_id) → pick a `string_id` �
 ### Implementation details
 - Each ability has an `input_schema`, `output_schema`, `execute_callback`, and `permission_callback`
 - Permission callbacks enforce per-action capability checks (e.g., `can_create_entry`)
-- Ability executors call the REST controllers' methods directly — the REST routes' own arg validation and permission callbacks do NOT run for ability calls. The two layers hold separate schema and permission definitions, so when debugging, reproduce through the same layer the failure came from
+- In 7.0, core abilities are implemented by `FrmAbilities*Controller` in Lite and `FrmProAbilities*Controller` in Pro, using model helpers and their own schemas/permissions. Add-ons can have different adapters. Diagnose the installed ability implementation and reproduce through MCP; do not assume every executor delegates to a REST controller.
 - Registered via hooks: categories (`register_categories`), abilities (`register_abilities`), wired into `wp_abilities_api_init`
 
 ## Common ability parameters

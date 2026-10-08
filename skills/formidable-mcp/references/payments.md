@@ -25,7 +25,7 @@ Like any field, create via `create-field` with `type` set to one of the above, o
 
 ### Registered types and per-form limits
 
-On a fully-loaded install (verified via `FrmFormActionsController::get_form_actions()`), the active payment action types are `stripe`, `square`, `paypal`, `payment`. Each is `limit => 1` — one payment action per form, same as `wppost`, `register`, `quiz`. Create it with `create-form-action`, `form_id` + `type` + `post_content`, the same call shape as every other action type (see `actions.md`).
+The active payment action types depend on the installed gateways: `stripe`, `square`, `paypal`, `payment`. Lite caps the built-in gateways at one action per form. In the reviewed 7.0 Pro implementation, `FrmProTransLiteController::allow_multiple_gateway_actions` raises these four action limits to **99**, including outside wp-admin, so core MCP can create multiple conditional gateway actions. Create with `create-form-action`, `form_id` + `type` + `post_content` (see `actions.md`). Configure mutually exclusive conditions when only one action should charge; multiple matching actions can process the same submission. Do not use an old one-action limitation as a reason to replace an existing action.
 
 ### `payment` (Stripe / Square / Authorize.net gateway)
 
@@ -44,6 +44,10 @@ On a fully-loaded install (verified via `FrmFormActionsController::get_form_acti
 ### `stripe` / `square` / `paypal` (standalone gateway action types)
 
 These are registered as their own action types (distinct from the generic `payment` type above) and follow the same `post_content` shape family — gateway credentials/mode, amount source, and event triggers. Read an existing action of the specific type first; this skill has no verified working payload for these three yet.
+
+### Stripe preview mode and existing transactions
+
+7.0 allows the Test Mode add-on to override Stripe's mode for a preview request. A preview flag is not a stored action `test_mode` setting. Existing transactions, return URLs, refunds and subscription operations must use the transaction's original `test` mode, even if the global Stripe mode changes. Read the payment/subscription record and use the MCP gateway ability; do not retry against another mode when an intent is missing. This feature does not authorize completing a test checkout against a merchant connection.
 
 ### Form-level payment defaults
 

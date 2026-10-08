@@ -2,6 +2,12 @@
 
 Read this when: creating, debugging, or verifying repeatable sections (repeaters) or nested forms in Formidable — the most error-prone area of form building via MCP.
 
+## 7.0 creation defaults and child forms
+
+Core abilities live in Lite/Pro. `create-field` seeds complete type defaults and merges partial `field_options`; copying 18/71+ default keys is no longer necessary. `update-field` merges with stored options. Both are shallow merges, so preserve complete nested maps when changing them.
+
+With Pro active, creating `type: "divider|repeat"` (or `divider` with `field_options.repeat: "1"`) automatically creates a linked child form if `form_select` is omitted. Read back its numeric `form_select` and the child form's `parent_form_id`, then create the section's child fields with `in_section` set to the divider ID. The **saved** divider must have a valid child reference; omission from the create request is supported. Explicitly creating a child form remains useful when controlling its name/content. New child fields without an explicit order are positioned in the section automatically; explicit orders must still satisfy the structure below. An invalid explicit child reference is rejected.
+
 ## Anatomy of a Repeater
 
 A repeatable field group requires FOUR components, in this order:
@@ -22,7 +28,7 @@ A repeatable field group requires FOUR components, in this order:
 - Which form they live in depends on the pattern (see Two Patterns below).
 - Fields should be consecutive in `field_order` (no gaps, no unrelated fields between them).
 - Can be any type (text, checkbox, textarea, etc.).
-- Always copy FULL default `field_options` (the complete default key set — typically 18 keys for simple fields: size, max, label, blank, required_indicator, invalid, unique_msg, separate_value, clear_on_focus, classes, custom_html, minnum, maxnum, step, format, placeholder, draft — plus `in_section`; template fields can have 71+ keys). Partial field_options cause rendering corruption.
+- Pass `in_section` plus the intended settings; 7.0 merges the type defaults automatically.
 
 ### 3. End divider field (end marker + buttons) — in the PARENT form
 - Type: `end_divider`
@@ -30,7 +36,7 @@ A repeatable field group requires FOUR components, in this order:
 - `field_options` should include `"add_label": "Add"` and `"remove_label": "Remove"` (or custom labels).
 - Its own `in_section` is `"0"` — it is not inside the repeater itself.
 - Renders hidden markup; JavaScript (formidablepro.js) turns it into the add/remove buttons.
-- Note: if `create-field` rejects the `end_divider` type, check the formidable-api plugin's ability validator (`FrmAPIAbilitiesController.php`) — `end_divider` must appear in its allowed field-type enums.
+- If `end_divider` is rejected, inspect the installed core `create-field` schema and active Pro plugin; the core implementation is `FrmAbilitiesFieldsController`, not the API add-on.
 
 ## Repeater child fields need a field_order inside the divider's range
 
@@ -64,7 +70,7 @@ $icon_class = ! empty( $field['form_select'] ) ? 'frm_repeat_icon' : 'frm-form-t
 - `form_select` set → repeater icon (⟳), plugin recognizes the repeater structure
 - `form_select` empty → header icon ("H"), broken repeater behavior
 
-> **Anti-pattern (do NOT do this):** Leaving `form_select` as `""` on a repeater divider — even for simple repeaters where `in_section` alone groups the fields. An empty `form_select` produces the "H" header icon and broken editor behavior. Always create a child form (even an empty one) purely so `form_select` has something to point to.
+> **Anti-pattern (do NOT do this):** Leaving `form_select` as `""` on a repeater divider — even for simple repeaters where `in_section` alone groups the fields. An empty `form_select` produces the "H" header icon and broken editor behavior. On 7.0, Pro can create the child automatically during divider creation; verify the saved `form_select` afterward.
 
 ## The Two Repeater Patterns
 
@@ -157,7 +163,7 @@ Use MCP abilities for all creates/updates, and MCP reads (e.g. `get-form`) for v
 #      "form_id": "1492",                 // PARENT form
 #      "type": "checkbox",
 #      "name": "North",
-#      "field_options": {"in_section": 13020, ...full default field_options},
+#      "field_options": {"in_section": 13020},
 #      "field_order": 56
 #    }
 #    (repeat for each field; keep orders consecutive between divider and end_divider)
@@ -176,7 +182,7 @@ Use MCP abilities for all creates/updates, and MCP reads (e.g. `get-form`) for v
 
 ## Requirements Common to Both Patterns
 
-1. **Child form creation** — always create a child form.
+1. **Child form** — create it explicitly or use Pro's 7.0 automatic creation; verify the returned reference.
 2. **parent_form_id** — always set it by passing `parent_form_id` to `create-form` when creating the child form (or `update-form` for an existing child form; never via SQL/wp-cli). When set, child fields appear nested/indented under the divider in the parent form editor, and Formidable recognizes the parent/child relationship. Refresh the editor after setting it. Verify with MCP `get-form`, which returns `parent_form_id`.
 3. **form_select on the divider** — always set to the child form ID.
 4. **in_section on every repeater field** — set to the divider's field ID.
@@ -239,7 +245,7 @@ Each of these breaks the repeater structure:
 4. **Missing `in_section` on repeater fields** — fields don't group under the divider.
 5. **Fields in the wrong form for the pattern** — e.g., putting Direct Parent fields into the child form, or duplicating nested-pattern fields into the parent (fields defined in the child AND given `in_section` copies in the parent appear twice — inside and outside the repeater).
 6. **Missing end_divider (or missing add_label/remove_label)** — no add/remove buttons.
-7. **Partial `field_options`** — always copy the full default option set (18 keys for basic fields; 71+ for template-derived fields) plus `in_section`. Partial or JSON-instead-of-PHP-serialized options corrupt rendering.
+7. **Field settings** — 7.0 MCP merges inherited defaults. Send JSON objects, not serialized PHP strings; verify `in_section`, child links and order before blaming missing defaults.
 8. **Debugging stale output** — MCP operations clear caches automatically; if output looks stale, hard-refresh the browser before suspecting the data. Manual cache flushing is a last-resort local troubleshooting step, never part of the workflow.
 9. **Assuming every repeater needs the nested-forms pattern** — simple flat groups belong in the parent (Direct Parent pattern); creating unnecessary child forms with fields complicates structure and debugging.
 10. **Blaming field_options corruption for structural problems** — when fields render in the wrong place, first verify the architecture (form_select, in_section, parent_form_id, field ordering) before suspecting data corruption.
