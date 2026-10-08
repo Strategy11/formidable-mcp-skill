@@ -1,16 +1,16 @@
 # Formidable Forms MCP Skill
 
-An [Agent Skill](https://code.claude.com/docs/en/skills) that teaches Claude how to build and manage
-[Formidable Forms](https://formidableforms.com) sites through the Formidable MCP adapter — forms, fields,
+An Agent Skill for [Claude Code](https://code.claude.com/docs/en/skills) and [Codex](https://developers.openai.com/codex/skills)
+that teaches your coding agent how to build and manage [Formidable Forms](https://formidableforms.com) sites through the Formidable MCP adapter — forms, fields,
 repeaters, entries, views, styles, form actions, applications, PDFs, and templates.
 
 The skill is documentation, not code: it encodes the working payloads, the field-option shapes, the
-ordering rules, and the known adapter bugs that are otherwise discovered the hard way. Claude reads the
+ordering rules, and the known adapter bugs that are otherwise discovered the hard way. The agent reads the
 relevant reference file before making MCP calls, so it gets the call right the first time.
 
 ## Requirements
 
-- WordPress with **Formidable Forms** and the Formidable MCP adapter available
+- WordPress 7.0+ with **Formidable Forms**, its MCP server turned on (Formidable → Settings → MCP), and PHP 7.4+
 - An MCP connection to that site — either the WP-CLI stdio bridge (server shell access, no password) or the
   HTTP endpoint with an application password. Setup for both is in
   [`skills/formidable-mcp/references/getting-started.md`](skills/formidable-mcp/references/getting-started.md),
@@ -20,7 +20,9 @@ relevant reference file before making MCP calls, so it gets the call right the f
 
 ## Install
 
-### As a Claude Code plugin (recommended)
+The repository is a plugin marketplace that both Claude Code and Codex can install from.
+
+### Claude Code
 
 ```
 /plugin marketplace add Strategy11/formidable-mcp-skill
@@ -29,52 +31,72 @@ relevant reference file before making MCP calls, so it gets the call right the f
 
 Update later with `/plugin marketplace update formidable`.
 
-### Manual install
-
-Copy the skill directory into your project or personal skills folder:
+### Codex
 
 ```bash
-git clone https://github.com/Strategy11/formidable-mcp-skill.git
-cp -r formidable-mcp-skill/skills/formidable-mcp ~/.claude/skills/
+codex plugin marketplace add Strategy11/formidable-mcp-skill
+codex plugin add formidable-mcp@formidable
 ```
 
-Use `.claude/skills/` inside a project instead of `~/.claude/skills/` to scope it to that project.
+Update later with `codex plugin marketplace upgrade formidable`. Start a new Codex session after installing.
+
+### Manual install (either agent)
+
+Clone the repo and link the skill directory into your agent's skills folder:
+
+| Agent | Personal | One project |
+|---|---|---|
+| Claude Code | `~/.claude/skills/` | `.claude/skills/` |
+| Codex | `~/.agents/skills/` | `.agents/skills/` |
+
+```bash
+git clone https://github.com/Strategy11/formidable-mcp-skill.git ~/formidable-mcp-skill
+mkdir -p ~/.claude/skills
+ln -s ~/formidable-mcp-skill/skills/formidable-mcp ~/.claude/skills/formidable-mcp   # and/or ~/.agents/skills/
+```
 
 ### Other agents and MCP clients
 
-Nothing here is Claude-specific below the packaging: the references are plain Markdown and the helpers are
-POSIX shell scripts needing only `curl` and `jq`. Clone the repo and point your tool at
+Nothing here depends on a particular agent below the packaging: the references are plain Markdown and the
+helpers are POSIX shell scripts needing only `curl` and `jq`. Clone the repo and point your tool at
 `skills/formidable-mcp/` — or read it yourself and drive `scripts/frm-mcp` from a terminal. The stdio bridge
-config works in any MCP client; per-client config locations are tabled in
-[`references/mcp-protocol.md`](skills/formidable-mcp/references/mcp-protocol.md) § "Transport 1".
+config works in any MCP client; per-client config (Claude Code, Claude Desktop, Codex, Cursor, VS Code) is
+tabled in [`references/mcp-protocol.md`](skills/formidable-mcp/references/mcp-protocol.md) § "Transport 1".
 
 ## Quickstart: connect a site
 
-Three commands and one edit. Full walkthrough — including the no-password option for local sites — is in
+Two steps in WordPress. In WP Admin → **Formidable → Settings → MCP**:
+
+1. Turn on **Enable the Formidable MCP server** and click **Download frm-mcp.env**. Each download creates a new
+   application password that only works on the Formidable MCP endpoint.
+2. Pick Claude Code or Codex, click **Copy setup prompt**, and paste it into your agent. It installs the skill,
+   moves the downloaded file into place without opening it, and runs `frm-mcp-setup` to check the connection.
+
+The MCP server ships with Formidable and needs WordPress 7.0+ and PHP 7.4+. Full walkthrough — including the
+no-password option for local sites and the manual route for older Formidable versions — is in
 [`skills/formidable-mcp/references/getting-started.md`](skills/formidable-mcp/references/getting-started.md).
 
-```bash
-cd skills/formidable-mcp/scripts    # installed elsewhere? find ~ -name frm-mcp-setup 2>/dev/null
-cp frm-mcp.env.example frm-mcp.env  # then edit it — see below
-./frm-mcp-setup                     # checks everything and says what's left to fix
-```
-
-Fill `frm-mcp.env` in with your own editor:
+To do step 2 yourself instead:
 
 ```bash
-SITE_URL="https://example.com"
-WP_USERNAME="your-wp-username"
-APPLICATION_PASSWORD="xxxx xxxx xxxx xxxx xxxx xxxx"
+mkdir -p ~/.config/formidable-mcp
+mv "$(ls -t ~/Downloads/frm-mcp*.env | head -1)" ~/.config/formidable-mcp/frm-mcp.env
+chmod 600 ~/.config/formidable-mcp/frm-mcp.env
+skills/formidable-mcp/scripts/frm-mcp-setup     # plugin install? the scripts are in the plugin cache, see below
 ```
 
-The application password comes from WP Admin → **Users → Profile → Application Passwords** on an
-administrator account (it is not the login password; spaces in it are fine). `frm-mcp.env` is gitignored, and
-`frm-mcp-setup` never prints its values.
+`~/.config/formidable-mcp/` is where the helpers look by default, and unlike the skill's own directory it
+survives plugin updates. With a plugin install the scripts themselves are in the agent's plugin cache —
+`~/.claude/plugins/cache/formidable/formidable-mcp/<version>/skills/formidable-mcp/scripts/` for Claude Code,
+`~/.codex/plugins/cache/formidable/formidable-mcp/<version>/skills/formidable-mcp/scripts/` for Codex.
+
+Revoke a file under **Manage connection files** on the same settings screen; each one stays valid until
+revoked, including after Formidable is deactivated.
 
 **Don't paste credentials into a chat with an AI assistant** — anything in a conversation is in the
-transcript and would need rotating afterward. The skill instructs Claude never to ask for them: it points you
-at this file and reads the output of `frm-mcp-setup` instead. If you do have shell access to the WordPress
-host, the WP-CLI bridge needs no password at all.
+transcript and would need rotating afterward. The skill instructs the agent never to ask for them: it moves
+the downloaded file without reading it, and reads the output of `frm-mcp-setup` instead. If you do have shell
+access to the WordPress host, the WP-CLI bridge needs no password at all.
 
 `./frm-mcp-setup` verifies local tooling, the config file, TLS, the MCP endpoint, authentication, and the
 abilities themselves, printing a specific fix for whatever fails. When it ends in `Connected.`, try a call:
@@ -85,12 +107,16 @@ abilities themselves, printing a specific fix for whatever fails. When it ends i
 
 ## Usage
 
-Once installed, ask for Formidable work in plain language and Claude loads the skill on its own:
+Once installed, ask for Formidable work in plain language and the agent loads the skill on its own:
 
 > Build me a multi-step job application form with a repeatable "previous employers" section, then create a
 > view that lists submissions by date.
 
-You can also invoke it explicitly with `/formidable-mcp`.
+You can also invoke it explicitly: `/formidable-mcp` in Claude Code, `$formidable-mcp` in Codex.
+
+Running from Codex over HTTP? Its default sandbox blocks network access, so approve running `frm-mcp` outside
+the sandbox when asked — details in
+[`getting-started.md`](skills/formidable-mcp/references/getting-started.md) § "Running `frm-mcp` from inside Codex".
 
 ## What's inside
 
@@ -106,6 +132,8 @@ skills/formidable-mcp/
 │   ├── styles.md             # Styles, themes, appearance
 │   ├── actions.md            # Email, confirmation, webhook, post creation, gated content
 │   ├── applications.md       # Applications (Pro)
+│   ├── coupons.md            # Discount codes: amounts, form assignment, limits, status
+│   ├── landing-pages.md      # Form landing pages: the 1:1 upsert, slugs, content, design
 │   ├── pdfs.md               # PDF downloads and email attachments
 │   ├── templates.md          # Form template XML import/export
 │   ├── mcp-protocol.md       # Transports, auth, session protocol, abilities catalog, errors
@@ -127,8 +155,10 @@ so **point it at a development site, not production**. It reads the same `frm-mc
 ## Configuration
 
 The `frm-mcp` helper and the smoke test read `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD` from a
-`frm-mcp.env` file next to the script (copy `frm-mcp.env.example` to start); environment variables of the
-same names override it, which is meant for CI rather than for typing a password into a command. The file is
+`frm-mcp.env` file — `$FRM_MCP_ENV` if set, else one next to the script, else
+`~/.config/formidable-mcp/frm-mcp.env`. Download it from Formidable's MCP settings, or copy
+`frm-mcp.env.example` and fill it in on older versions. Environment variables of the same names override it,
+which is meant for CI rather than for typing a password into a command. Beside the scripts the file is
 gitignored — keep credentials out of version control, out of chat transcripts, and out of shell history, and
 use a WordPress [application password](https://wordpress.org/documentation/article/application-passwords/)
 rather than an account password.

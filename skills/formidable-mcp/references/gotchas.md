@@ -1,12 +1,12 @@
 # Known Bugs & Gotchas
 
-Read this when: an MCP ability call fails, silently does nothing, or returns empty results — check here for known symptoms before debugging from scratch.
+Read this when: an MCP ability call fails, silently does nothing, returns empty results, or a list count disagrees with the admin screen — check here for known symptoms before debugging from scratch.
 
 ## Active Bugs
 
-When a new failure appears, record it here (symptom → cause → status) and prefer fixing it in the `formidable-api` plugin over documenting a workaround — workarounds that bypass the API (wp-cli writes, direct SQL) are not acceptable. Once a bug is fixed, don't archive it here: fold whatever behavior it clarified into the relevant reference file and delete the entry. The plugin is unreleased, so there are no old builds in the wild whose symptoms need recognizing.
+When a new failure appears, record it here (symptom → cause → status). Diagnose the plugin that implements the installed ability: core MCP lives in Lite/Pro in 7.0, while add-ons implement their own abilities. Do not bypass MCP with wp-cli or SQL writes. Once a bug is fixed, fold the clarified behavior into the relevant reference, retaining a version caveat only when older installed builds need it.
 
-- None currently.
+- **`create-coupon` without `start` produces a coupon that silently never applies.** The ability defaults `'start' => ''` and never fills it, while `FrmCouponsAppHelper::check_coupon_object_for_status()` returns `'draft'` on `empty( $coupon_data->start )`. So a call with just the documented required fields (`name`, `code`, `amount`) succeeds, returns `status: "draft"`, and discounts nothing — no error, no warning. Evidence it is API-specific: on the dev site all 9 admin-created coupons carry a start date and only the MCP-created one did not; the admin UI always sets one. Adding `start` via `update-coupon` was the only change needed to flip it to `active`. **Status: open** — the schema description now warns ("A coupon with no start date is a draft and never applies") but the behavior is unchanged (re-verified against current `formidable-coupons`). Right fix is to default `start` to now in the model, matching the admin; failing that, refuse the create without it. Until then, always send `start`. See `coupons.md`.
 
 ## Standing Cautions
 
@@ -29,7 +29,7 @@ When a new failure appears, record it here (symptom → cause → status) and pr
 - **Repeater display after import**: `[foreach]` reads the parent's cached child-ID array, which the importer never remaps — see `repeaters.md` "Displaying Repeater Rows in Views" for the import-proof `parent_item_id`-filtered nested-view pattern.
 - **`create-entry` runs Formidable's duplicate-submission check** (`FrmEntry::is_duplicate`): a create identical to a recent entry fails with "It looks like you've already submitted that." To seed several identical test entries, create them with unique values first, then `update-entry` each to the target value (updates skip the check). Core's `frm_time_to_check_duplicates` filter can shorten the window if the API should ever allow duplicates.
 - **Field values are top-level parameters or an `item_meta` object, keyed by field id or field key** (id wins when both are given for one field). A nested `values` object is rejected with a clear error. `create-entry` also accepts `is_draft`, `user_id`, and `created_at`; `update-field` accepts `type` (installed-types enum) and an optional `form_id` to move a field.
-- **`list-entries` includes draft entries by default** (it is backed by the current `frm/v3` controllers). Pass `is_draft: 0` to get only submitted entries, or `is_draft: 1` for drafts only. Only the frozen legacy `frm/v2` REST namespace still excludes drafts unconditionally.
+- **`list-entries` includes draft entries by default** (it is backed by the current `frm/v3` controllers). Pass `is_draft: 0` to get only submitted entries, or `is_draft: 1` for drafts only. Only the frozen legacy `frm/v2` REST namespace still excludes drafts unconditionally. **Spam entries (`is_draft: 4`) are never listed**, and `is_draft` rejects any value but `0`/`1`. Read one with `get-entry` by ID instead, and expect its meta HTML-escaped. See `entries-and-views.md` § "Spam entries".
 - **`number` fields silently cap at 9999999 (7 digits) by default.** A `create-entry` with a larger value fails with `field####: Please select a lower number` — Formidable's default `maxnum` field option, not an MCP limit. Raise it before seeding large values: `update-field {"id": "<field_id>", "field_options": {"minnum": "0", "maxnum": "999999999", "step": "1"}}`. Bites arcade-score / currency / population-style data where 8+ digits are normal.
 - **Per-option selection limits apply to MCP entry writes too.** If a choice field's options carry a `limit` (max times each option can be chosen across entries), entry writes fail with `field####: The maximum number of times the following choices can be selected was reached: <option>` once the quota is used. This is form validation working as designed — pick a different option or raise the limit.
 
@@ -45,9 +45,31 @@ When a new failure appears, record it here (symptom → cause → status) and pr
   - Always read the view back with `get-view` after writing sort options and confirm both came back as arrays of the length you sent.
 - **Grid View content boxes do not need a `style` key.** `style` is optional and only stored when it holds something: the editor's own save path writes it solely under `if ( ! empty( $box_data['style'] ) )`, so an empty `"style": {}` you send is dropped the next time the view is saved from wp-admin. Boxes written as `{"box":0,"content":"..."}` render correctly on the front end and open normally in the builder with the "Grid Style Settings" panel fully populated (verified in the builder against a grid view whose boxes carry no `style` key at all). Send `style` only when setting real values such as `{"borderStyle":"none"}`.
 
+### Coupons
+
+- **A coupon needs a `start` date AND a form assignment before it does anything.** See the active bug above for `start`. On the form side, `allowed_form_ids` is derived from the `allowed_coupons` setting on each form's **coupon field**, not stored on the coupon — so an empty `allowed_form_ids` means the coupon works on **no** form, not all of them (`FrmCouponsFilterHelper::filter_coupons_for_form()` returns `array()`).
+- **Assigning a coupon to a form that has no Coupon field is silently dropped.** `assign_coupon_to_form()` opens with `FrmProFormsHelper::has_field( 'coupon', $form_id )` and returns early when there isn't one — no error, the ID just never shows up in `allowed_form_ids`. `list-fields` for a `coupon` field first, and read `allowed_form_ids` back after every write.
+- **`allowed_form_ids` replaces the whole set**, it doesn't append. Send the full list each time; omit the key to leave assignments alone.
+- **`status` is computed on read, never settable** (`draft`/`invalid`/`scheduled`/`expired`/`limit_reached`/`active`), which makes reading it back the cheapest confirmation that a coupon is live.
+- **An exhausted coupon reports "Invalid coupon code" on the front end**, not anything about the usage limit — pre-existing add-on wording, and misleading while debugging. Exhaustion does genuinely block the discount, not just the status (verified: total unchanged, no discount applied).
+- **`code` and `amount` are frozen once a coupon has been used on an entry.** Create a new coupon instead of repointing an old one.
+- **Product options need a `price` key.** `{label, value}` alone is accepted and renders `data-frmprice=""` with a permanently $0.00 total, so a coupon has nothing to discount — see `forms-and-fields.md` § "Layout & Composite Fields".
+- **Formidable's price calc doesn't fire on programmatic `value` assignment.** Dispatch real `input`/`change` events when driving a pricing form in a browser, and JS-click the coupon Apply button (`browser_click` times out on the stability wait).
+
+### Landing pages
+
+- **A form has at most one landing page — use `save-landing-page` for every write.** It upserts, so it creates when the form has none and updates when it has one, and cannot produce a duplicate (verified: same input twice → same id with `created: false`, and zero forms site-wide with more than one page). `update-landing-page` exists only for when you already hold a post ID, and cannot move a page between forms.
+- **Two switches gate rendering: `status: "publish"` and `enabled: true`.** `enabled` is the add-on's toggle, stored as the form option `landing_page_id` holding `'1'` or `''` (despite the name, nothing reads it as an ID). A published-but-disabled page is not served — the usual cause of an unexplained 404.
+- **Landing pages are served from the site root, so slugs compete with every post and page.** A taken slug is **rejected** (`frm_landing_slug_taken`), not silently suffixed. A reserved one — anything starting with `wp-`, the REST prefix, `admin`, `login` and similar — is rejected with `frm_landing_slug_reserved`.
+- **An explicit empty `title` is rejected** (`frm_landing_invalid_title`), including whitespace or markup only. Omit `title` to keep the default/current one.
+- **The form embed is always guaranteed on the page.** Supply `content` that already embeds the assigned form (by ID or key, shortcode or block) and it is kept verbatim with `form_embed_injected: false`; supply content without it and the canonical block embed is **appended**, `form_embed_injected: true`. Include the embed yourself to control where the form sits.
+- **Settings are split between the post and the form.** `title`/`slug`/`status`/`content` are on the `frm_landing_page` post; `enabled`/`layout`/`bg_image_id`/`opacity` are form options. Worth knowing when verifying raw storage.
+- **`delete-landing-page` is cleaner than the add-on's own delete button.** The ability hard-deletes the post *and* clears the toggle (verified: no orphan options, URL 404s); the admin button only trashes the post and leaves the toggle on, so the next form-settings save regenerates a page. Prefer the ability. Note `force: false` trashes instead, and a trashed page still counts as the form's landing page: reads still find it, a write without `status`/`enabled` is refused with `frm_landing_page_trashed`, and a write with one restores the same post. Details in `landing-pages.md` § Delete.
+
 ### Forms & Applications
 
-- **MCP-created forms/fields are equivalent to builder-created ones — don't "fix" the differences.** MCP forms omit the auto `submit` field the builder adds, and MCP fields store only the base default `field_options` (the builder's AJAX insert adds ~54 extra Pro keys). Both are benign: forms render a working submit button via the `submit_html` fallback, absent field_options resolve to defaults through `FrmField::get_option`, and opening the form in the builder self-heals both. Don't force-add the missing keys.
+- **`list-forms` includes repeater/embedded child forms, so its total can exceed the Forms screen count.** Child forms have `parent_form_id > 0`, but that field is absent from list summaries. Page through the full list, use `get-form` to check each parent ID, and count only top-level forms when comparing with the Forms screen. Trash is excluded from `list-forms` and counted separately in the admin. See `forms-and-fields.md` § "Counting Forms".
+- **MCP-created forms/fields are equivalent to builder-created ones — don't "fix" the differences.** MCP forms omit the auto `submit` field the builder adds, and 7.0 MCP fields seed type defaults and merge the supplied `field_options`, while the builder may add further context-specific settings. Both are benign: forms render a working submit button via the `submit_html` fallback, absent field_options resolve to defaults through `FrmField::get_option`, and opening the form in the builder self-heals both. Don't force-add the missing keys.
 - **Draft forms are invisible inside applications.** `add-item-to-application` succeeds and writes the `_frm_form_id` termmeta, but `FrmProApplication::get_forms_for_application()` filters `status = 'published'`, so a draft form is missing from `list-application-items` and the card's form count. Publish the form and it appears — this is core Pro behavior, not an MCP bug.
 - **`get-form` rendered HTML: the parameter is `return: "html"`** (a `format` param is silently ignored); the markup comes back in `data.renderedHtml` and includes the assigned style's `frm_style_*` class — useful for verifying style assignment without a browser.
 
@@ -56,7 +78,11 @@ When a new failure appears, record it here (symptom → cause → status) and pr
 - **`create-form-action` runs the action class's `update()` method, the same as `update-form-action` and the wp-admin save.** Add-on actions do real work there — the Quizzes actions call `FrmQuizzesField::maybe_add_score_field()` to auto-insert the hidden `quiz_score` field the form needs, and On Submit sanitizes its redirect URL. One `create-form-action` call is enough; the old advice to follow every add-on action with a no-op `update-form-action` no longer applies. Still `list-fields` afterwards to confirm what the action added.
 - **Quiz field types cannot be created directly.** `quiz_score` and `quiz_timer` are rejected by the field-type enum on `create-form`/`create-field` (`input[fields][N][type] is not one of …`), and their builder buttons are `display: none` by design. You do not need them: creating the quiz action inserts the field for you.
 - **Scored quizzes still work without a score field, outcomes don't.** Per-question scoring and "Correct answer: X" render from the action settings alone, but `maybe_set_outcome_to_item_meta()` returns early when the form has no `quiz_score` field, so quiz outcomes produce nothing on the frontend.
-- See `templates.md` § "quiz (scored)" for the Formidable Quizzes add-on's `post_content` schema.
+- **Unlike `quiz_score`, `quiz_timer` is only auto-inserted when the timer is actually on.** `quiz_score` is added on every `create-form-action`/`update-form-action` call for a quiz action, regardless of settings; `quiz_timer` only appears when that same call's `post_content` has a truthy `timer_enabled`. Enable the timer after the fact (`update-form-action` with `{"timer_enabled": "1", "timer_duration": "300"}`) and `list-fields` to confirm the field landed — don't assume it exists just because the form has a quiz action.
+- **`timer_duration` is seconds, not minutes** — `"300"` is 5 minutes, not 300 minutes. Also: `timer_enabled: "1"` with an empty/non-numeric `timer_duration` is silently treated as "no timer" (`FrmQuizzesTimerHelper::load_timer_settings()` returns `false`) rather than erroring, so a timer that "isn't showing" is usually this.
+- **`quiz_timer`'s entry meta is a raw millisecond integer, not the formatted string the field displays.** Read `"<field_key>-value"`-style raw meta (or just the field's own meta, since `quiz_timer` has no separate `-value` companion like `quiz_score` does) for math; the "48.213 s" / "48213 ms" text is `prepare_display_value()` output, not what's stored.
+- **MCP `create-entry` never populates `quiz_timer`** — the elapsed-time write happens in `save_submit_time()`, keyed off a `frm_quiz_token` from the browser's "Start Quiz" click, which an API-created entry never has. Timer enforcement is skipped the same way (`timer_session_is_required()` excludes admin/AJAX-less API calls), so seeding quiz entries via MCP works for scoring but never exercises the timer.
+- See `templates.md` § "quiz (scored)" and its "Timer" subsection for the Formidable Quizzes add-on's full `post_content` schema.
 
 ### Styles
 
@@ -88,7 +114,7 @@ When a new failure appears, record it here (symptom → cause → status) and pr
 ```json
 {
   "form_id": "1429",
-  "type": "confirmation",
+  "type": "on_submit",
   "post_content": {
     "success_action": "message",
     "success_msg": "Your message here",
@@ -98,3 +124,5 @@ When a new failure appears, record it here (symptom → cause → status) and pr
 ```
 
 **Note:** The confirmation message lives at `post_content.success_msg`, NOT `confirmation_message`.
+
+**The type id is `on_submit`, not `confirmation`.** "Confirmation" is only the UI label; `type: "confirmation"` fails with "Invalid action type".

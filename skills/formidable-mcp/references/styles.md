@@ -125,6 +125,10 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
 
 Assignment sets `custom_style` in the form's options (verify with a form-options query: expect e.g. `custom_style: "15"`).
 
+## 7.0 style class changes
+
+The visual styler can rename an existing style's CSS class/slug, keeping it unique and rescoping its custom CSS. A changed title alone does not imply a changed class. This is an admin save feature; check the installed `update-style` schema before trying to rename `post_name`, and do not put it in `post_content` as though it were a color setting. Read the actual returned style key before assigning styles or writing class selectors. The default style remains protected from deletion, including when an MCP ID is sent as a string.
+
 ## Updating Styles
 
 Use MCP; all colors, fonts, and spacing persist correctly:
