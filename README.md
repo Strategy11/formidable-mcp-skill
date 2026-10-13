@@ -10,7 +10,7 @@ relevant reference file before making MCP calls, so it gets the call right the f
 
 ## Requirements
 
-- WordPress 7.0+ with **Formidable Forms**, its MCP server turned on (Formidable → Settings → MCP), and PHP 7.4+
+- WordPress 6.9+ with **Formidable Forms**, its MCP server turned on (Formidable → Settings → MCP), and PHP 7.4+
 - An MCP connection to that site — either the WP-CLI stdio bridge (server shell access, no password) or the
   HTTP endpoint with an application password. Setup for both is in
   [`skills/formidable-mcp/references/getting-started.md`](skills/formidable-mcp/references/getting-started.md),
@@ -72,21 +72,20 @@ Two steps in WordPress. In WP Admin → **Formidable → Settings → MCP**:
 2. Pick Claude Code or Codex, click **Copy setup prompt**, and paste it into your agent. It installs the skill,
    moves the downloaded file into place without opening it, and runs `frm-mcp-setup` to check the connection.
 
-The MCP server ships with Formidable and needs WordPress 7.0+ and PHP 7.4+. Full walkthrough — including the
+The MCP server ships with Formidable and needs WordPress 6.9+ and PHP 7.4+. Full walkthrough — including the
 no-password option for local sites and the manual route for older Formidable versions — is in
 [`skills/formidable-mcp/references/getting-started.md`](skills/formidable-mcp/references/getting-started.md).
 
 To do step 2 yourself instead:
 
 ```bash
-mkdir -p ~/.config/formidable-mcp
-mv "$(ls -t ~/Downloads/frm-mcp*.env | head -1)" ~/.config/formidable-mcp/frm-mcp.env
-chmod 600 ~/.config/formidable-mcp/frm-mcp.env
+mv "$(ls -t ~/Downloads/frm-mcp*.env | head -1)" skills/formidable-mcp/scripts/frm-mcp.env
+chmod 600 skills/formidable-mcp/scripts/frm-mcp.env
 skills/formidable-mcp/scripts/frm-mcp-setup     # plugin install? the scripts are in the plugin cache, see below
 ```
 
-`~/.config/formidable-mcp/` is where the helpers look by default, and unlike the skill's own directory it
-survives plugin updates. With a plugin install the scripts themselves are in the agent's plugin cache —
+Keep `frm-mcp.env` beside the installed helper in `scripts/`. After a plugin update, move the connection
+file beside the current helper. With a plugin install the scripts are in the agent's plugin cache —
 `~/.claude/plugins/cache/formidable/formidable-mcp/<version>/skills/formidable-mcp/scripts/` for Claude Code,
 `~/.codex/plugins/cache/formidable/formidable-mcp/<version>/skills/formidable-mcp/scripts/` for Codex.
 
@@ -155,8 +154,7 @@ so **point it at a development site, not production**. It reads the same `frm-mc
 ## Configuration
 
 The `frm-mcp` helper and the smoke test read `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD` from a
-`frm-mcp.env` file — `$FRM_MCP_ENV` if set, else one next to the script, else
-`~/.config/formidable-mcp/frm-mcp.env`. Download it from Formidable's MCP settings, or copy
+`frm-mcp.env` file in the skill's `scripts/` folder, or `$FRM_MCP_ENV` if explicitly set. Download it from Formidable's MCP settings, or copy
 `frm-mcp.env.example` and fill it in on older versions. Environment variables of the same names override it,
 which is meant for CI rather than for typing a password into a command. Beside the scripts the file is
 gitignored — keep credentials out of version control, out of chat transcripts, and out of shell history, and

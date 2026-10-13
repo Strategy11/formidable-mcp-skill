@@ -20,16 +20,8 @@
 # Exit code 0 means the connection works and you can start making calls.
 set -uo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
-# Same lookup as frm-mcp: $FRM_MCP_ENV, then beside the script (clones), then
-# the per-user config directory that survives plugin updates.
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/formidable-mcp"
-if [ -n "${FRM_MCP_ENV:-}" ]; then
-  ENV_FILE="$FRM_MCP_ENV"
-elif [ -f "$DIR/frm-mcp.env" ]; then
-  ENV_FILE="$DIR/frm-mcp.env"
-else
-  ENV_FILE="$CONFIG_DIR/frm-mcp.env"
-fi
+# Same lookup as frm-mcp: $FRM_MCP_ENV, then beside the installed script.
+ENV_FILE="${FRM_MCP_ENV:-$DIR/frm-mcp.env}"
 EXAMPLE_FILE="$DIR/frm-mcp.env.example"
 
 if [ -t 1 ]; then
@@ -163,7 +155,7 @@ if [ "$anon" = "404" ]; then
   The MCP server is off, can't run, or permalinks are set to "Plain":
     WP Admin -> Formidable -> Settings -> MCP -> turn on "Enable the Formidable
       MCP server". If it is on, that screen says why it isn't running (it needs
-      WordPress 7.0+ and PHP 7.4+). Formidable versions without an MCP settings
+      WordPress 6.9+ and PHP 7.4+). Formidable versions without an MCP settings
       section need the "Formidable Forms API" add-on active instead.
     WP Admin -> Settings -> Permalinks -> any structure other than Plain
 EOF

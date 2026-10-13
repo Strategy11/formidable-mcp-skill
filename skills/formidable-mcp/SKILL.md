@@ -5,7 +5,7 @@ description: Create, query, and manage everything in Formidable Forms via MCP â€
 
 ## Overview
 
-This skill covers all Formidable Forms work through the Formidable MCP adapter. It is self-contained and portable: everything needed to do the work correctly is in this file and the `references/` directory. Site-specific access details (credentials, URLs, local paths) intentionally live outside this skill â€” they belong in a local `frm-mcp.env` file, normally `~/.config/formidable-mcp/frm-mcp.env`, so the skill stays portable across sites and survives plugin updates.
+This skill covers all Formidable Forms work through the Formidable MCP adapter. It is self-contained and portable: everything needed to do the work correctly is in this file and the `references/` directory. Site-specific access details (credentials, URLs, local paths) belong in a local `scripts/frm-mcp.env` file beside the installed helper. The file is gitignored and stays separate from the shared skill instructions. After a plugin update, keep the connection file beside the current helper.
 
 ## Not connected yet? Start here
 

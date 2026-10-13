@@ -25,7 +25,7 @@ The step-2 box shows **Connected** once the downloaded password is used for the 
 **When you receive that prompt**, it asks for three things:
 
 1. **Install or update the skill** — the commands are in § "1. Install the skill". If the skill only loads after a restart, say so and stop there.
-2. **Move the download into place** — the newest `~/Downloads/frm-mcp*.env` goes to `~/.config/formidable-mcp/frm-mcp.env`, moved with `mv` and never opened, printed, or quoted. Exact commands in `mcp-protocol.md` § "Moving a downloaded file into place". (Older prompts say "beside the skill's `scripts/frm-mcp`". That works too, but a plugin update loses it, so prefer the config directory.)
+2. **Move the download into place** — the newest `~/Downloads/frm-mcp*.env` goes beside the installed helper as `scripts/frm-mcp.env`, moved with `mv` and never opened, printed, or quoted. Exact commands in `mcp-protocol.md` § "Moving a downloaded file into place".
 3. **Run `scripts/frm-mcp-setup`** and report what it says. On `Connected.`, carry on with the user's Formidable requests.
 
 If anything fails, use § "Troubleshooting the first connection" — and never ask for the values in the file.
@@ -87,19 +87,18 @@ The rest of this file writes that directory as `scripts/` — `cd` into it first
 
 ### 2. Confirm the site side is ready
 
-On the WordPress site: **Formidable Forms** active, with **Formidable → Settings → MCP → Enable the Formidable MCP server** turned on, and permalinks set to anything other than "Plain". The MCP adapter ships with Formidable and needs WordPress 7.0+ and PHP 7.4+; if something blocks it, the settings screen says what. (Formidable versions without an MCP settings section need the **Formidable Forms API** add-on, which ships the adapter.) Step 4 below tells you if anything is missing, so this is a glance, not a project.
+On the WordPress site: **Formidable Forms** active, with **Formidable → Settings → MCP → Enable the Formidable MCP server** turned on, and permalinks set to anything other than "Plain". The MCP adapter ships with Formidable and needs WordPress 6.9+ and PHP 7.4+; if something blocks it, the settings screen says what. (Formidable versions without an MCP settings section need the **Formidable Forms API** add-on, which ships the adapter.) Step 4 below tells you if anything is missing, so this is a glance, not a project.
 
-### 3. Put a connection file in `~/.config/formidable-mcp/frm-mcp.env`
+### 3. Put a connection file beside the helper in `scripts/`
 
 **Download it (recommended).** Formidable → Settings → MCP → **Download frm-mcp.env**, as an **administrator** (ability permission callbacks check real capabilities, so an editor's password gets 403s on most calls). Then move it into place:
 
 ```bash
-mkdir -p ~/.config/formidable-mcp
-mv "$(ls -t ~/Downloads/frm-mcp*.env | head -1)" ~/.config/formidable-mcp/frm-mcp.env
-chmod 600 ~/.config/formidable-mcp/frm-mcp.env
+mv "$(ls -t ~/Downloads/frm-mcp*.env | head -1)" frm-mcp.env
+chmod 600 frm-mcp.env
 ```
 
-That's the whole step: the file comes filled in, and its password only works for Formidable MCP. The config directory matters for plugin installs: their `scripts/` directory is replaced on every update, and a file kept beside the scripts would be lost with it. (A `frm-mcp.env` beside the scripts still works and wins if present, which suits a cloned install. `FRM_MCP_ENV=/path/to/file` overrides both.)
+That's the whole step: the file comes filled in, and its password only works for Formidable MCP. Keep it beside the current helper after a plugin update. `FRM_MCP_ENV=/path/to/file` explicitly overrides the adjacent-file default.
 
 **Or make one by hand**, on a Formidable version without the download button:
 
@@ -110,10 +109,9 @@ That's the whole step: the file comes filled in, and its password only works for
 Then, in a terminal:
 
 ```bash
-mkdir -p ~/.config/formidable-mcp
-cp scripts/frm-mcp.env.example ~/.config/formidable-mcp/frm-mcp.env
-chmod 600 ~/.config/formidable-mcp/frm-mcp.env
-open -e ~/.config/formidable-mcp/frm-mcp.env    # or: nano, code
+cp frm-mcp.env.example frm-mcp.env
+chmod 600 frm-mcp.env
+open -e frm-mcp.env    # or: nano, code
 ```
 
 Fill in the three values and save:
@@ -138,7 +136,7 @@ Notes that save the most time here:
 ./frm-mcp-setup
 ```
 
-It checks local tools, the config file, TLS, the endpoint, authentication, and the abilities themselves — and when something is wrong it prints the specific fix rather than a stack trace. If no config file exists anywhere, it creates `~/.config/formidable-mcp/frm-mcp.env` from the template (readable only by you); it changes nothing else, and never prints credential values. A healthy run ends:
+It checks local tools, the config file, TLS, the endpoint, authentication, and the abilities themselves — and when something is wrong it prints the specific fix rather than a stack trace. If the selected config file is missing, it creates `scripts/frm-mcp.env` from the template (readable only by you); it changes nothing else, and never prints credential values. A healthy run ends:
 
 ```
 5. Formidable abilities
@@ -206,7 +204,7 @@ A message that gets someone unstuck, adaptable verbatim:
 > 1. In WP Admin → Formidable → Settings → MCP, turn on the MCP server and click **Download frm-mcp.env**.
 > 2. Tell me when it's downloaded. I'll move it into place without opening it, and run a check that never prints the password. Please don't paste the file's contents here — anything in this chat is in the transcript, and I don't need to see it.
 
-On a Formidable version without that button, swap step 1 for creating an application password (Users → Profile → Application Passwords) and having them fill in `~/.config/formidable-mcp/frm-mcp.env` from the template themselves, then run `frm-mcp-setup` and read its output.
+On a Formidable version without that button, swap step 1 for creating an application password (Users → Profile → Application Passwords) and having them fill in `scripts/frm-mcp.env` from the template themselves, then run `frm-mcp-setup` and read its output.
 
 The output is safe to share by design: it can name the site URL, the WordPress username, the config file path, and — only on failure — up to 20 lines of the site's own HTTP response. The application password appears in none of them, in any encoding.
 
@@ -222,7 +220,7 @@ If the user pastes a credential anyway: don't repeat it back, and tell them to r
 | `404` on `/wp-json/mcp/formidable-mcp` | MCP server toggle off or blocked, or permalinks are "Plain" | Formidable → Settings → MCP → turn it on (the screen names any blocker); change permalinks. Older Formidable: activate the API add-on |
 | `401` / `rest_not_logged_in` / `rest_forbidden` | Wrong or revoked password, non-admin user, or the host strips the `Authorization` header | Download a new file; use an admin; `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1` in `.htaccess` |
 | `403` / `frm_mcp_skill_scope` | A downloaded password used outside Formidable MCP — another REST route, `discover-abilities`, or a non-Formidable ability | Expected: these passwords are scoped. Use `frm-mcp` with `formidable-forms/*` abilities; see `mcp-protocol.md` § "Scoped connection-file passwords" |
-| Worked before a skill update, now `Set SITE_URL …` | `frm-mcp.env` was beside the scripts in an old plugin version's directory | Download a new file and put it in `~/.config/formidable-mcp/` |
+| Worked before a skill update, now `Set SITE_URL …` | `frm-mcp.env` was beside the scripts in an old plugin version's directory | Download a new file and put it beside the current helper in `scripts/` |
 | `curl: (60) SSL certificate problem` | Local dev self-signed certificate | Trust the environment's CA (Local's "Trust" button, `valet trust`, `mkcert -install`) or set `FRM_MCP_CACERT` in `frm-mcp.env` |
 | `Session not found` / `Missing Mcp-Session-Id` | Session expired mid-run | Nothing — `frm-mcp` re-initializes and retries automatically |
 | `curl: (7) Failed to connect` from Codex, but `./frm-mcp-setup` works in a terminal | Codex's sandbox blocks network by default | Approve running the command outside the sandbox — see § "Running `frm-mcp` from inside Codex" |

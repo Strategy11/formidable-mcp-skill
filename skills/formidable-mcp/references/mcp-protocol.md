@@ -34,8 +34,7 @@ Before the first call, the site URL and credentials must be somewhere the toolin
 The helpers look for the file in this order, first match wins:
 
 1. `$FRM_MCP_ENV`, if set
-2. `frm-mcp.env` next to `scripts/frm-mcp` — fine for a cloned install
-3. `~/.config/formidable-mcp/frm-mcp.env` (`$XDG_CONFIG_HOME` is respected) — **the recommended location.** A plugin install keeps `scripts/` in a version-numbered cache directory that the next update replaces, and a file beside the script is left behind with it.
+2. `frm-mcp.env` next to the installed `scripts/frm-mcp` — **the default location.** Keep the file beside the current helper after a plugin update.
 
 Credentials stay out of version control, off the command line, and out of permission prompts — the helper reads them at call time instead.
 
@@ -45,11 +44,11 @@ The setup prompt on Formidable's settings screen asks the assistant to do this s
 
 ```bash
 f=$(ls -t ~/Downloads/frm-mcp*.env 2>/dev/null | head -1)    # browsers rename repeats: "frm-mcp (1).env"
-mkdir -p ~/.config/formidable-mcp
-mv "$f" ~/.config/formidable-mcp/frm-mcp.env && chmod 600 ~/.config/formidable-mcp/frm-mcp.env
+scripts_dir="/path/to/installed/skill/scripts"
+mv "$f" "$scripts_dir/frm-mcp.env" && chmod 600 "$scripts_dir/frm-mcp.env"
 ```
 
-Then run `scripts/frm-mcp-setup`. If no file matches, say so and ask the user to download it again — don't search further afield or ask for the values. Replacing an existing `frm-mcp.env` is expected (each download is a new password); once the new one connects, remind the user they can revoke the older files under **Manage connection files**. On macOS the terminal may need permission to read Downloads the first time; in Codex the move writes outside the workspace and needs approval to run outside the sandbox.
+Use the actual installed `scripts/` path for `scripts_dir`, then run `scripts/frm-mcp-setup`. If no file matches, say so and ask the user to download it again — don't search further afield or ask for the values. Replacing an existing `frm-mcp.env` is expected (each download is a new password); once the new one connects, remind the user they can revoke the older files under **Manage connection files**. On macOS the terminal may need permission to read Downloads the first time; in Codex the move writes outside the workspace and needs approval to run outside the sandbox.
 
 **Never ask the user to paste credentials into the conversation, and never type them into a command.** An application password sent to an AI assistant is in the transcript, in the model provider's logs, and potentially in a permission prompt or shell history — it must be rotated afterward, so treat pasted credentials as burned. This applies to every route to the same secret:
 
@@ -164,18 +163,18 @@ Only needed on a Formidable version without **Download frm-mcp.env** — the dow
 1. WP Admin → **Users → Profile** (of an **administrator** — the ability permission callbacks check real capabilities, so a low-role user's password will get 403s on most abilities)
 2. Scroll to **Application Passwords**, enter a name (e.g. `formidable-mcp`), click **Add New Application Password**
 3. Copy the generated password immediately (shown once)
-4. Paste it straight into `~/.config/formidable-mcp/frm-mcp.env` (copied from `frm-mcp.env.example`) as `APPLICATION_PASSWORD`, alongside `SITE_URL` and `WP_USERNAME`. Spaces in the password are fine — keep the quotes. Nothing else needs to see this value; it should not be pasted into a chat, a command, or a shell export.
+4. Paste it straight into `scripts/frm-mcp.env` (copied from `frm-mcp.env.example`) as `APPLICATION_PASSWORD`, alongside `SITE_URL` and `WP_USERNAME`. Spaces in the password are fine — keep the quotes. Nothing else needs to see this value; it should not be pasted into a chat, a command, or a shell export.
 
 Requirements & hosting gotchas:
 
 - **WordPress requires HTTPS** for application passwords by default (local `.local`/`.test` environments are exempted as "local"). If the Application Passwords section is missing from the profile screen, the site is plain HTTP on a non-local host.
 - **Self-signed certs** (Local by Flywheel, Laravel Valet, DDEV, etc.): trust the environment's local CA rather than disabling verification — Local has "Trust" beside the site's SSL entry, Valet has `valet trust`, DDEV has `mkcert -install`. Failing that, point curl at the certificate with `--cacert /path/to/local-ca.pem`. Reach for `-k` only as a temporary local workaround, never against a remote site.
 - **Some hosts strip the `Authorization` header** before it reaches PHP (common on Apache CGI/FastCGI). Symptom: valid credentials always return `401`/`rest_not_logged_in`. Fix in `.htaccess`: `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1` (or `CGIPassAuth On` on Apache 2.4.13+).
-- The MCP adapter ships with Formidable Lite and runs only while **Formidable → Settings → MCP → Enable the Formidable MCP server** is on; it needs WordPress 7.0+ (the Abilities API) and PHP 7.4+. Formidable versions without that settings section get the adapter from the Formidable Forms API add-on instead. If `/wp-json/mcp/formidable-mcp` 404s, check the toggle (the screen says why the server isn't running when something blocks it) and that permalinks aren't set to "Plain".
+- The MCP adapter ships with Formidable Lite and runs only while **Formidable → Settings → MCP → Enable the Formidable MCP server** is on; it needs WordPress 6.9+ (the Abilities API) and PHP 7.4+. Formidable versions without that settings section get the adapter from the Formidable Forms API add-on instead. If `/wp-json/mcp/formidable-mcp` 404s, check the toggle (the screen says why the server isn't running when something blocks it) and that permalinks aren't set to "Plain".
 
 ### Step 1 — Point the helper at the site (once per machine)
 
-Put a downloaded `frm-mcp.env` at `~/.config/formidable-mcp/frm-mcp.env` (§ "Moving a downloaded file into place"), or copy `scripts/frm-mcp.env.example` there and fill in `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD`. That is the whole connection setup — see "Connecting" above for why the values belong in the file and nowhere else.
+Put a downloaded `frm-mcp.env` at `scripts/frm-mcp.env` (§ "Moving a downloaded file into place"), or copy `scripts/frm-mcp.env.example` there and fill in `SITE_URL`, `WP_USERNAME`, and `APPLICATION_PASSWORD`. That is the whole connection setup — see "Connecting" above for why the values belong in the file and nowhere else.
 
 ### Step 2 — Make calls through the bundled helper
 
@@ -762,7 +761,7 @@ All ability responses follow this pattern:
 
 ### 404 on `/wp-json/mcp/formidable-mcp`
 **Cause:** The MCP server is off or can't run, or permalinks are set to "Plain".
-**Fix:** Formidable → Settings → MCP → turn on **Enable the Formidable MCP server**; if it's on, that screen names what blocks it (WordPress 7.0+, PHP 7.4+). On Formidable versions without that section, activate the Formidable Forms API add-on. Set permalinks to any non-Plain structure.
+**Fix:** Formidable → Settings → MCP → turn on **Enable the Formidable MCP server**; if it's on, that screen names what blocks it (WordPress 6.9+, PHP 7.4+). On Formidable versions without that section, activate the Formidable Forms API add-on. Set permalinks to any non-Plain structure.
 
 ### 403 `frm_mcp_skill_scope`
 **Cause:** A password from **Download frm-mcp.env** was used for something outside its scope — a REST route other than the MCP endpoint, `mcp-adapter-discover-abilities`, or a non-Formidable ability. See § "Scoped connection-file passwords".

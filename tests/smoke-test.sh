@@ -8,7 +8,7 @@
 #
 # Configuration comes from frm-mcp.env (SITE_URL, WP_USERNAME,
 # APPLICATION_PASSWORD), found the same way the frm-mcp helper finds it — at
-# $FRM_MCP_ENV, the skill's scripts/ directory, or ~/.config/formidable-mcp/ —
+# $FRM_MCP_ENV or the skill's scripts/ directory —
 # so credentials stay out of the command line and shell history. FRM_MCP_URL and
 # FRM_MCP_AUTH still override it for CI, where the values come from a secret
 # store rather than being typed.
@@ -25,13 +25,7 @@ set -u
 
 # Fall back to the skill's local config file when the env vars aren't set.
 SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)/../skills/formidable-mcp/scripts"
-if [ -n "${FRM_MCP_ENV:-}" ]; then
-  ENV_FILE="$FRM_MCP_ENV"
-elif [ -f "$SCRIPTS_DIR/frm-mcp.env" ]; then
-  ENV_FILE="$SCRIPTS_DIR/frm-mcp.env"
-else
-  ENV_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/formidable-mcp/frm-mcp.env"
-fi
+ENV_FILE="${FRM_MCP_ENV:-$SCRIPTS_DIR/frm-mcp.env}"
 if [ -z "${FRM_MCP_URL:-}" ] || [ -z "${FRM_MCP_AUTH:-}" ]; then
   if [ -f "$ENV_FILE" ]; then
     SITE_URL=""; WP_USERNAME=""; APPLICATION_PASSWORD=""
