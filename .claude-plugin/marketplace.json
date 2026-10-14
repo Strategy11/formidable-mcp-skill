@@ -10,7 +10,7 @@
     {
       "name": "formidable-mcp",
       "source": "./",
-      "description": "Create, query, and manage everything in Formidable Forms via MCP — forms, fields, repeaters, entries, views, styles, form actions, applications, PDFs, templates, and known MCP bugs",
+      "description": "Manage Formidable Forms via MCP: setup, forms, fields, entries, views, actions, coupons, payments, translations, PDFs, templates, and landing-page abilities",
       "category": "wordpress",
       "tags": ["formidable", "wordpress", "forms", "mcp"]
     }

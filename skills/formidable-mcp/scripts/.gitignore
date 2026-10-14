@@ -1,2 +1,4 @@
-frm-mcp.env
+frm-mcp*.env
+!frm-mcp.env.example
 .mcp-session
+.mcp-session-*

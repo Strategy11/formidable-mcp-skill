@@ -72,13 +72,14 @@ Composite fields (name, address) use `default_value` and `placeholder` as JSON w
 
 **Lite fields**: text, textarea, name, email, url, phone, number, hidden, password, checkbox, radio, select, html, user_id, captcha, credit_card, submit, gdpr, product, quantity, total
 
-**Pro fields**: file, date, time, rte, address, summary, scale, star, range, toggle, data, lookup, divider, break, form, ranking, likert, nps, signature, ai, tag, payment-gateway, quiz_score, ssa-appointment, virtual, coupon
+**Pro fields**: file, date, time, rte, address, summary, scale, star, range, toggle, data, lookup, divider, break, form, ranking, likert, nps, signature, ai, tag, payment-gateway, quiz_score, quiz_timer, ssa-appointment, virtual, coupon
 
 **Special fields**:
 - `divider` with `"repeat":"0"` (static section) or `"repeat":"1"` (repeatable)
 - `end_divider` — closes a repeatable section
 - `break` — page break for multi-page forms
 - `quiz_score` — displays computed quiz score
+- `quiz_timer` — hidden field storing a timed quiz's elapsed time (ms); only added when the quiz action's timer is enabled, see § "Timer" below
 
 ## Form Options (options JSON)
 
@@ -181,6 +182,28 @@ This is a distinct add-on (`formidable-quizzes` plugin) from core Formidable's d
 - The add-on injects its own read-only `quiz_score` field (type `quiz_score`, not creatable via `create-field`) when the action is created. Its entry meta is `{"<field_key>": "80/100", "<field_key>-value": "80"}` — use the field key alone (e.g. `[gafp2]`) in shortcodes/graphs/stats for the `"80/100"` display or for `frm-stats`/`frm-math`, which read the numeric prefix.
 - **Rescoring existing entries**: scoring only fires on the events listed in `event`. To backfill entries created before the action existed, include `"update"` in `event`, then `update-entry` each one resending its question-field answers — that recompute is what updates the score field. Writing the quiz_score field directly does not stick; the add-on overwrites it from the answers on save.
 - Verify with a real browser submission (fill, submit, then read the entry via `list-entries`) before calling a quiz done — the score is computed at submit time, so a config error shows up there and nowhere earlier.
+
+#### Timer (optional countdown, add-on 3.2+)
+
+Three top-level `post_content` settings, alongside `quiz`/`enable`:
+
+```json
+{
+  "timer_enabled": "1",
+  "timer_duration": "300",
+  "start_button_label": "Begin Exam"
+}
+```
+
+- `timer_enabled` — toggle (`"1"`/`""`). When on, a start page (time limit + a button) renders before the form fields, and the fields stay hidden (`frm-quiz-not-started` class) until the respondent clicks it.
+- `timer_duration` — **seconds**, not minutes, despite what a UI label elsewhere might suggest — plain integer, e.g. `"300"` for 5 minutes. Required and must be a positive number for the timer to actually render; `timer_enabled: "1"` with no valid `timer_duration` is silently treated as no timer at all.
+- `start_button_label` — text for the start-page button. Defaults to "Start Quiz" when empty.
+- Enabling the timer auto-inserts a read-only **`quiz_timer`** field (hidden field type, like `quiz_score` — not creatable via `create-field`, rejected by the field-type enum). Its entry meta stores **elapsed milliseconds as a plain integer** (e.g. `"48213"`), not a formatted string like the score field's `"80/100"`; the field's own `prepare_display_value()` renders it as `"48213 ms"` under 1 second or `"48.213 s"` at/above 1 second — for calculations use the raw stored meta, not the display string.
+- Countdown is enforced **server-side** at submit (`frm_validate_entry`), not just in the browser: a submission arriving after `timer_duration` + a small grace period (default 30s, filterable via `frm_quizzes_timer_grace_period`) is rejected with a "Time is up" validation error, and a submission with no start token at all is rejected outright rather than waved through untimed. Don't rely on client-side JS alone when testing enforcement.
+- When time runs out, **only required fields stay editable** — every other field is locked to whatever value it held at that instant (`FrmQuizzesTimerLockHelper`), giving the respondent a short completion window (default 300s) to finish required fields and submit rather than losing the entry outright.
+- A timed quiz that also has a page break (`break` field) is automatically forced into AJAX submit mode (`ajax_submit: 1`), even if the form wasn't built that way — a non-AJAX multi-page form can't finalize submission from a middle page, which would strand the timer's auto-submit.
+- `[frm-quiz-timer form=123]` shortcode moves just the countdown bar to a custom position; pair it with `add_filter( 'frm_quizzes_auto_render_timer', '__return_false' )` (code-level, not MCP-settable) so it doesn't also render in its default spot below the form title. The start page itself always stays with the form and cannot be relocated.
+- Entries created via `create-entry` (no browser, no start token) skip timer enforcement entirely — same exemption core admin/import entries get. Useful for seeding sample quiz data without a Playwright round trip, but it means MCP-created entries never get a `quiz_timer` value.
 
 #### Alternative: core Formidable's documented calc-based quiz (no add-on required, always reliable)
 

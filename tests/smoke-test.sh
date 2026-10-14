@@ -6,8 +6,9 @@
 # Usage:
 #   ./smoke-test.sh
 #
-# Configuration comes from the skill's scripts/frm-mcp.env (SITE_URL,
-# WP_USERNAME, APPLICATION_PASSWORD) — the same file the frm-mcp helper reads,
+# Configuration comes from frm-mcp.env (SITE_URL, WP_USERNAME,
+# APPLICATION_PASSWORD), found the same way the frm-mcp helper finds it — at
+# $FRM_MCP_ENV or the skill's scripts/ directory —
 # so credentials stay out of the command line and shell history. FRM_MCP_URL and
 # FRM_MCP_AUTH still override it for CI, where the values come from a secret
 # store rather than being typed.
@@ -23,7 +24,8 @@
 set -u
 
 # Fall back to the skill's local config file when the env vars aren't set.
-ENV_FILE="$(cd "$(dirname "$0")" && pwd)/../skills/formidable-mcp/scripts/frm-mcp.env"
+SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)/../skills/formidable-mcp/scripts"
+ENV_FILE="${FRM_MCP_ENV:-$SCRIPTS_DIR/frm-mcp.env}"
 if [ -z "${FRM_MCP_URL:-}" ] || [ -z "${FRM_MCP_AUTH:-}" ]; then
   if [ -f "$ENV_FILE" ]; then
     SITE_URL=""; WP_USERNAME=""; APPLICATION_PASSWORD=""
@@ -34,7 +36,7 @@ if [ -z "${FRM_MCP_URL:-}" ] || [ -z "${FRM_MCP_AUTH:-}" ]; then
   fi
 fi
 
-: "${FRM_MCP_URL:?Set SITE_URL in skills/formidable-mcp/scripts/frm-mcp.env (or FRM_MCP_URL)}"
+: "${FRM_MCP_URL:?Set SITE_URL in $ENV_FILE (or FRM_MCP_URL)}"
 : "${FRM_MCP_AUTH:?Set WP_USERNAME + APPLICATION_PASSWORD in frm-mcp.env (or FRM_MCP_AUTH)}"
 
 # TLS options for every curl below. Expanded with the ${arr[@]+...} guard because

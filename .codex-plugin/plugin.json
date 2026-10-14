@@ -1,0 +1,24 @@
+{
+  "name": "formidable-mcp",
+  "version": "1.1.0",
+  "description": "Manage Formidable Forms via MCP: setup, forms, fields, entries, views, actions, coupons, payments, translations, PDFs, templates, and landing-page abilities",
+  "author": {
+    "name": "Strategy11",
+    "url": "https://formidableforms.com"
+  },
+  "homepage": "https://github.com/Strategy11/formidable-mcp-skill",
+  "repository": "https://github.com/Strategy11/formidable-mcp-skill",
+  "license": "MIT",
+  "keywords": [
+    "formidable",
+    "formidable-forms",
+    "wordpress",
+    "mcp",
+    "forms"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Formidable Forms MCP",
+    "shortDescription": "Formidable Forms MCP workflows and version-aware reference docs"
+  }
+}

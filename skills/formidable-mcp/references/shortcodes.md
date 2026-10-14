@@ -832,7 +832,7 @@ Gotchas: `link_type=scroll` needs a View on the same page whose container ID mat
 | `style` | `0`/`1` | `1` | `0` disables built-in styling |
 | `no_entries` | Text | "No Entries Found" | Empty message |
 | `clickable` | `0`/`1` | `0` | Clickable links in values |
-| `drafts` | `1`, `"both"`, `0` | `0` | Include drafts |
+| `drafts` | `1`, `"both"`, `"all"`, `0` | `0` | Include drafts. `all` is every status, including spam entries |
 | `user_id` | ID, username, or `"current"` | all | One user's entries |
 | `edit_link` | Text | not shown | Edit-link label (pair with `page_id`) |
 | `page_id` | Page ID | — | Page holding the edit form |
@@ -900,7 +900,7 @@ Optional parameters:
 | `limit` | Max entries included | `limit=5` |
 | `decimal` | Max decimal places (no trailing zeros) | `decimal=2` |
 | `dec_point` / `thousands_sep` | Number formatting characters | `dec_point=","` |
-| `drafts` | `1` = drafts only, `both` = drafts + submitted; default excluded | `drafts=both` |
+| `drafts` | `1` = drafts only, `both` = drafts + submitted, `all` = every status including spam entries; default excluded | `drafts=both` |
 | `created_at_greater_than` / `created_at_less_than` | `Y-m-d` or strtotime string | `created_at_greater_than="-1 month"` |
 
 Field-value filtering (fields in the **same form only**) — the field ID is the parameter name:
