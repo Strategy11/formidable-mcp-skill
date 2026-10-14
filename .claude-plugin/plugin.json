@@ -2,8 +2,8 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "formidable-mcp",
   "displayName": "Formidable Forms MCP",
-  "version": "1.0.0",
-  "description": "Create, query, and manage everything in Formidable Forms via MCP — forms, fields, repeaters, entries, views, styles, form actions, applications, PDFs, templates, and known MCP bugs",
+  "version": "1.1.0",
+  "description": "Manage Formidable Forms via MCP: setup, forms, fields, entries, views, actions, coupons, payments, translations, PDFs, templates, and landing-page abilities",
   "author": {
     "name": "Strategy11",
     "url": "https://formidableforms.com"

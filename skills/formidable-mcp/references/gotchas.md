@@ -6,7 +6,7 @@ Read this when: an MCP ability call fails, silently does nothing, returns empty 
 
 When a new failure appears, record it here (symptom → cause → status). Diagnose the plugin that implements the installed ability: core MCP lives in Lite/Pro in 7.0, while add-ons implement their own abilities. Do not bypass MCP with wp-cli or SQL writes. Once a bug is fixed, fold the clarified behavior into the relevant reference, retaining a version caveat only when older installed builds need it.
 
-- **`create-coupon` without `start` produces a coupon that silently never applies.** The ability defaults `'start' => ''` and never fills it, while `FrmCouponsAppHelper::check_coupon_object_for_status()` returns `'draft'` on `empty( $coupon_data->start )`. So a call with just the documented required fields (`name`, `code`, `amount`) succeeds, returns `status: "draft"`, and discounts nothing — no error, no warning. Evidence it is API-specific: on the dev site all 9 admin-created coupons carry a start date and only the MCP-created one did not; the admin UI always sets one. Adding `start` via `update-coupon` was the only change needed to flip it to `active`. **Status: open** — the schema description now warns ("A coupon with no start date is a draft and never applies") but the behavior is unchanged (re-verified against current `formidable-coupons`). Right fix is to default `start` to now in the model, matching the admin; failing that, refuse the create without it. Until then, always send `start`. See `coupons.md`.
+- **`create-coupon` without `start` produces a coupon that silently never applies.** The ability defaults `'start' => ''` and never fills it, while `FrmCouponsAppHelper::check_coupon_object_for_status()` returns `'draft'` on `empty( $coupon_data->start )`. So a call with just the documented required fields (`name`, `code`, `amount`) succeeds, returns `status: "draft"`, and discounts nothing — no error, no warning. Evidence it is API-specific: on the dev site all 9 admin-created coupons carry a start date and only the MCP-created one did not; the admin UI always sets one. Adding `start` via `update-coupon` was the only change needed to flip it to `active`. **Status: open** — the schema description now warns ("A coupon with no start date is a draft and never applies") but the behavior is unchanged. Right fix is to default `start` to now in the model, matching the admin; failing that, refuse the create without it. Until then, always send `start`. See `coupons.md`.
 
 ## Standing Cautions
 
@@ -47,8 +47,10 @@ When a new failure appears, record it here (symptom → cause → status). Diagn
 
 ### Coupons
 
+Requires Formidable Coupons **v1.1 or later**. If a coupon endpoint is unavailable, check whether the site is running an older version.
+
 - **A coupon needs a `start` date AND a form assignment before it does anything.** See the active bug above for `start`. On the form side, `allowed_form_ids` is derived from the `allowed_coupons` setting on each form's **coupon field**, not stored on the coupon — so an empty `allowed_form_ids` means the coupon works on **no** form, not all of them (`FrmCouponsFilterHelper::filter_coupons_for_form()` returns `array()`).
-- **Assigning a coupon to a form that has no Coupon field is silently dropped.** `assign_coupon_to_form()` opens with `FrmProFormsHelper::has_field( 'coupon', $form_id )` and returns early when there isn't one — no error, the ID just never shows up in `allowed_form_ids`. `list-fields` for a `coupon` field first, and read `allowed_form_ids` back after every write.
+- **Invalid coupon form assignments reject the whole write.** Missing Coupon field → `frm_coupon_form_missing_coupon_field`; invalid/nonexistent form IDs → `frm_coupon_invalid_form_ids`. Both return HTTP 400 with a “Nothing was saved” message; validation runs before saving the coupon or synchronizing assignments. Check for a `coupon` field first, fix every rejected form ID, and read `allowed_form_ids` back after a successful write.
 - **`allowed_form_ids` replaces the whole set**, it doesn't append. Send the full list each time; omit the key to leave assignments alone.
 - **`status` is computed on read, never settable** (`draft`/`invalid`/`scheduled`/`expired`/`limit_reached`/`active`), which makes reading it back the cheapest confirmation that a coupon is live.
 - **An exhausted coupon reports "Invalid coupon code" on the front end**, not anything about the usage limit — pre-existing add-on wording, and misleading while debugging. Exhaustion does genuinely block the discount, not just the status (verified: total unchanged, no discount applied).
@@ -57,6 +59,8 @@ When a new failure appears, record it here (symptom → cause → status). Diagn
 - **Formidable's price calc doesn't fire on programmatic `value` assignment.** Dispatch real `input`/`change` events when driving a pricing form in a browser, and JS-click the coupon Apply button (`browser_click` times out on the stability wait).
 
 ### Landing pages
+
+Requires the Formidable Landing Pages add-on. If a landing-page endpoint is unavailable, check whether the add-on needs updating.
 
 - **A form has at most one landing page — use `save-landing-page` for every write.** It upserts, so it creates when the form has none and updates when it has one, and cannot produce a duplicate (verified: same input twice → same id with `created: false`, and zero forms site-wide with more than one page). `update-landing-page` exists only for when you already hold a post ID, and cannot move a page between forms.
 - **Two switches gate rendering: `status: "publish"` and `enabled: true`.** `enabled` is the add-on's toggle, stored as the form option `landing_page_id` holding `'1'` or `''` (despite the name, nothing reads it as an ID). A published-but-disabled page is not served — the usual cause of an unexplained 404.

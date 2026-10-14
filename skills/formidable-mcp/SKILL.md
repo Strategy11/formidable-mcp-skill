@@ -34,7 +34,7 @@ Read the reference file(s) for the task at hand BEFORE making MCP calls. Do not 
 | **Coupons / discount codes** — creating codes, percentage vs flat discounts, assigning a coupon to a form, usage limits, coupon status | `references/coupons.md` — **read before any `create-coupon`**, three required fields alone produce a coupon that never applies |
 | **Payments** — payment/payment-gateway fields, Stripe/Square/PayPal/Authorize.net gateway actions, listing/refunding payments or cancelling subscriptions | `references/payments.md` — **never submit a test payment against a connected merchant account; verify by reading the action back, not by charging a card** |
 | **Translations** — WPML-backed form/field string translations (requires the WPML compatibility add-on + WPML active) | `references/translations.md` — `string_id` (source string) and `translation_id` (one language's translation) are different IDs, don't mix them up |
-| **Form landing pages** — giving a form its own page at the site root, page content/design, enabling or removing one | `references/landing-pages.md` |
+| **Form landing pages** — giving a form its own page, editing content/design, enabling or removing one | `references/landing-pages.md` |
 | PDF downloads — `[frm-pdf]` links in views/pages/emails, entry/View PDFs, email PDF attachments, Dompdf rendering constraints | `references/pdfs.md` |
 | Graphs/charts (`[frm-graph]`), stats, search — full treatment is in the shortcodes reference | `references/shortcodes.md` §8 |
 | MCP setup, session protocol, abilities catalog, auth, errors | `references/mcp-protocol.md` |
@@ -58,4 +58,4 @@ Read the reference file(s) for the task at hand BEFORE making MCP calls. Do not 
 
 ## Version-aware settings
 
-Core MCP abilities ship in Lite/Pro in 7.0; the API add-on is not required for them. Read `references/advanced-settings.md` for 7.0 settings and capability boundaries. New `field_options` merge with type defaults; updates merge with stored options, and nested arrays/maps are replaced as a whole. Use targeted payloads and verify saved values rather than copying unrelated settings from another form. Do not infer feature support merely because an options object was accepted.
+Core MCP abilities ship in Lite/Pro in 7.0; the API add-on is not required for them. If a documented endpoint is unavailable or an ability is missing, check whether Formidable or the add-on implementing it needs updating. Coupon abilities require Coupons v1.1 or later. Read `references/advanced-settings.md` for 7.0 settings and capability boundaries. New `field_options` merge with type defaults; updates merge with stored options, and nested arrays/maps are replaced as a whole. Use targeted payloads and verify saved values rather than copying unrelated settings from another form. Do not infer feature support merely because an options object was accepted.

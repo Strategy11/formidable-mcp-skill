@@ -1,0 +1,20 @@
+{
+  "name": "formidable",
+  "interface": {
+    "displayName": "Formidable Forms"
+  },
+  "plugins": [
+    {
+      "name": "formidable-mcp",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

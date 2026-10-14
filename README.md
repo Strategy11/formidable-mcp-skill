@@ -18,6 +18,12 @@ relevant reference file before making MCP calls, so it gets the call right the f
 - Some features referenced (repeaters, views, applications, PDFs) require Formidable Pro or add-ons;
   each reference notes where.
 
+## Version scope
+
+Plugin package version **1.1.0** is the skill version, separate from WordPress plugin versions. Core MCP abilities and advanced settings require Formidable **7.0 or later**. Coupon abilities require Formidable Coupons **v1.1 or later**. Landing-page abilities require the Formidable Landing Pages add-on. Other references note their Pro and add-on requirements. If an endpoint is unavailable, check whether Formidable or the relevant add-on needs updating.
+
+Payment docs have no end-to-end gateway testing, and translation docs have no live WPML end-to-end testing. See the dedicated references for these limitations.
+
 ## Install
 
 The repository is a plugin marketplace that both Claude Code and Codex can install from.
@@ -39,6 +45,8 @@ codex plugin add formidable-mcp@formidable
 ```
 
 Update later with `codex plugin marketplace upgrade formidable`. Start a new Codex session after installing.
+
+To install a local checkout, run `codex plugin marketplace add /absolute/path/to/formidable-mcp-skill`, then the same `codex plugin add formidable-mcp@formidable`. The Codex catalog is `.agents/plugins/marketplace.json`; its `source.path: "./"` resolves to the repository root. The compatibility manifest `.codex-plugin/plugin.json` declares `skills: "./skills/"`, following the [official packaging documentation](https://developers.openai.com/plugins/build/plugins).
 
 ### Manual install (either agent)
 
@@ -132,7 +140,7 @@ skills/formidable-mcp/
 │   ├── actions.md            # Email, confirmation, webhook, post creation, gated content
 │   ├── applications.md       # Applications (Pro)
 │   ├── coupons.md            # Discount codes: amounts, form assignment, limits, status
-│   ├── landing-pages.md      # Form landing pages: the 1:1 upsert, slugs, content, design
+│   ├── landing-pages.md      # Form landing pages: 1:1 upsert, slugs, content, design
 │   ├── pdfs.md               # PDF downloads and email attachments
 │   ├── templates.md          # Form template XML import/export
 │   ├── mcp-protocol.md       # Transports, auth, session protocol, abilities catalog, errors

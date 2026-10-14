@@ -354,7 +354,10 @@ All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` 
 | `list-application-items` | List all items in an application | readonly, idempotent |
 | `delete-application` | Delete an application (requires application_id) | destructive |
 
-### Coupons (requires the Formidable Coupons add-on)
+### Coupons (requires Formidable Coupons v1.1 or later)
+
+Requires Formidable Coupons **v1.1 or later**. If a coupon endpoint is unavailable, check whether the site is running an older version. See `coupons.md` for usage and assignment errors.
+
 | Ability | Description | Notes |
 |---|---|---|
 | `list-coupons` | List coupons (id, name, code, amount, uses, dates, `allowed_form_ids`, computed status); supports paging, `order_by` (`id`/`name`/`date`/`modified`), `search` (name or code), `form_id` | readonly, idempotent |
@@ -364,6 +367,9 @@ All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` 
 | `delete-coupon` | Delete a coupon by ID or code; submitted entries keep their code | destructive |
 
 ### Landing Pages (requires the Formidable Landing Pages add-on)
+
+Requires the Formidable Landing Pages add-on. If a landing-page endpoint is unavailable, check whether the add-on needs updating.
+
 | Ability | Description | Notes |
 |---|---|---|
 | `list-landing-pages` | List the site's landing pages (id, form_id/form_key, slug, url, status, enabled, content, layout, background); supports paging, `status`, `order` | readonly, idempotent |

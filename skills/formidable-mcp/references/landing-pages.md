@@ -2,6 +2,8 @@
 
 Read this when: giving a form its own standalone page at the site root, editing that page's content or design, or debugging a landing page that doesn't render. Source: `formidable-landing` plugin code + an end-to-end run (page created, rendered on the `frm_landing_page` template, submission accepted from it, upsert and delete invariants checked in the DB).
 
+Requires the Formidable Landing Pages add-on. If a landing-page endpoint is unavailable, check whether the add-on needs updating.
+
 ## The one rule that shapes everything: a form has at most one landing page
 
 The relationship is 1:1. That is why the write ability is an **upsert** rather than a create:

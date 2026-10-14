@@ -2,6 +2,8 @@
 
 Read this when: creating or editing discount codes, assigning coupons to forms, or debugging a coupon that shows the wrong status or refuses to discount. Source: `formidable-coupons` plugin code + an end-to-end run on a live pricing form (coupon applied, entry submitted, usage counter incremented, limit exhaustion verified).
 
+Requires Formidable Coupons **v1.1 or later**. If a coupon endpoint is unavailable, check whether the site is running an older version.
+
 ## Abilities
 
 | Ability | Notes |
@@ -37,7 +39,7 @@ Omit `start` and the coupon comes back `status: "draft"` and never applies — n
 Two consequences:
 
 - **Empty `allowed_form_ids` means the coupon works on NO form**, not on all of them. `FrmCouponsFilterHelper::filter_coupons_for_form()` returns `array()` when the form has no coupon field or its `allowed_coupons` is empty.
-- **A form with no Coupon field is silently dropped.** `assign_coupon_to_form()` starts with `FrmProFormsHelper::has_field( 'coupon', $form_id )` and `return`s if there isn't one. No error surfaces; the ID just never appears in `allowed_form_ids`. So `list-fields` the target form for a `coupon` field first, and **read `allowed_form_ids` back** after the write to confirm the assignment landed.
+- **Invalid coupon form assignments reject the whole write.** Missing Coupon field → `frm_coupon_form_missing_coupon_field`; invalid/nonexistent form IDs → `frm_coupon_invalid_form_ids`. Both return HTTP 400 with a “Nothing was saved” message; validation runs before saving the coupon or synchronizing assignments. Check for a `coupon` field first, fix every rejected form ID, and read `allowed_form_ids` back after a successful write.
 
 `allowed_form_ids` **replaces** the whole assignment set rather than adding to it — send the full list every time. Omit the key to leave assignments alone.
 

@@ -2,7 +2,7 @@
 
 Read this for submission quotas, GDPR/retention, linked image choices, composite-field logic, date/time ranges, autocomplete, or diagnosing changed 7.0 behavior. "Other" placeholders are in [forms-and-fields.md](forms-and-fields.md#other-write-in-option-for-choice-fields); payment action limits are in [payments.md](payments.md#registered-types-and-per-form-limits).
 
-These settings were reviewed against the local Lite 7.0.2b and Pro 7.0.1b source and the changes since each repository's `v6.35` tag. Beta behavior can change. On another site, inspect the installed ability schema and read back saved settings; a successful write alone does not prove a feature is supported. Pro/add-on features require their implementing plugin to be active.
+These settings require Formidable 7.0 or later. Inspect the installed ability schema and read back saved settings; a successful write alone does not prove a feature is supported. Pro/add-on features require their implementing plugin to be active.
 
 ## Submission limits (Pro)
 
