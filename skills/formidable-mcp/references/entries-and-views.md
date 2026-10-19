@@ -195,6 +195,8 @@ curl -s -X POST "https://your-site.local/wp-json/mcp/formidable-mcp" \
 
 Views display form entries in different formats (table, list, grid). They are stored as WordPress posts of type `frm_display`.
 
+For Gutenberg content, Pretty mode click-to-edit, visitor controls, whole-View visibility, live metrics, and the new shared pagination appearance settings, read [Views editor and controls](views-editor-and-controls.md) before writing content. Grid content responses can be JSON strings or decoded box arrays depending on the build; parse only strings.
+
 Ability: `formidable-forms/create-view`
 
 Parameters:
@@ -758,7 +760,7 @@ Alternative: field IDs also work (e.g., `[13086]`), but field keys are preferred
 Per view type:
 
 - **Classic (`all`)**: `detail_content` is raw HTML. Setting a non-empty value auto-switches `frm_show_count` to `dynamic` (required for detail routing — the API keeps it in sync; clearing the content switches it back to `all`).
-- **Grid / table (layout views)**: `detail_content` is a JSON box array (same format as listing content), and a **detail layout** must exist — but `create-view` builds it from the `detail_content` boxes for you (`sync_layout_with_box_content( $view_id, 'detail', … )`, verified: `[{"id":0,"layout":1,"boxes":[{"id":1}]}]`). Only `update-view` skips it: it syncs the *listing* layout alone, so adding `detail_content` to an existing view still needs `create-view-layout` with `type: "detail"`. For a **table** view, a detail-link column is just another box in `content` — `create-view`/`update-view` sync the listing layout with the content boxes automatically (`FrmAPIViewsController::sync_layout_with_box_content()`), so no `create-view-layout` call is needed; either put `<a href="[detaillink]">View</a>` in the box's `content` or set `detailsLink: 1` on a box to wrap that whole cell in the link.
+- **Grid / table (layout views)**: `detail_content` is a JSON box array (same format as listing content), and a **detail layout** must exist. Current Views builds/synchronizes it on both create and update and adjusts detail routing; older API builds synchronized only the listing layout on update and needed `create-view-layout` with `type: "detail"`. Verify with `list-view-layouts`, especially after custom nested layouts. For a **table** view, a detail-link column is just another box in `content` — create/update synchronizes the listing layout automatically, so no separate layout call is needed; either put `<a href="[detaillink]">View</a>` in the box's `content` or set `detailsLink: 1` on a box to wrap that whole cell in the link.
 - **Timeline**: `detail_content` is raw HTML. A non-empty value makes each card an entry link automatically; for the hover **details popup** instead, set `frm_options.timeline_options.settings.show_details_popup = 1` via the `options` param — send the complete `timeline_options` structure (`{style: [], settings: {...all keys...}}`), because `options` replaces top-level keys wholesale. Note: the timeline's own `/entry/<id>` links render the listing, not a detail page (detail routing only honors `dynamic`/`calendar` views) — prefer the popup.
 
 ## Querying Views
