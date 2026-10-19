@@ -24,6 +24,7 @@ Read the reference file(s) for the task at hand BEFORE making MCP calls. Do not 
 | **7.0 advanced settings** — submission counts/time periods, GDPR consent/retention, linked image choices, composite-field logic, date/time ranges, autocomplete | `references/advanced-settings.md` plus the relevant task reference |
 | Repeaters (repeatable sections) or nested/embedded forms | `references/repeaters.md` — **always**, this is the most error-prone area |
 | Entries (submissions), spam entries, views, field statistics | `references/entries-and-views.md` (spam: § "Spam entries") |
+| **New Views editor** — Gutenberg blocks, Pretty mode click-to-edit, visitor controls, visibility rules, live metrics, pagination appearance | `references/views-editor-and-controls.md` plus `references/entries-and-views.md` for the grid/layout model |
 | **Choosing a view type, styling a view, or laying one out** — tables, card grids, column counts, view Custom CSS | `references/entries-and-views.md` § "Styling views", § "Grid views" and § "Table views" — **read before writing any view content**, see rule 9 |
 | Nested views — showing a second form's related entries inside a view (parent/child, shared field) | `references/shortcodes.md` §7 `[display-frm-data]` → "Nested Views", plus view filters in `references/entries-and-views.md` |
 | Styles / appearance / themes | `references/styles.md` |

@@ -114,6 +114,16 @@ wp eval '
 
 Specialized field types provide proper validation, formatting, and user experience. Before falling back to generic `text`, check if a specialized type matches the field's purpose.
 
+## Textarea width and rows
+
+For `textarea` fields, `field_options.size` is the CSS **width**, not the row count or character count. A numeric value such as `3` becomes `width:3px !important` on ordinary forms and landing pages. Leave `size` empty (or omit it when creating a field) to inherit the form style's width. Set `field_options.max` to the number of visible rows:
+
+```json
+{"type":"textarea","name":"What are you working on?","field_options":{"size":"","max":3}}
+```
+
+When updating an existing narrow textarea, explicitly set `size` to `""` to clear its saved width. Verify the rendered width on desktop and mobile before capturing screenshots or video.
+
 ## Field Labels (Required)
 
 **Every form field MUST have the `name` column populated with a label.**
