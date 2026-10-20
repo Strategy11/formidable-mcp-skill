@@ -1,6 +1,6 @@
 ---
 name: formidable-mcp
-description: Create, query, and manage everything in Formidable Forms via MCP — first-time setup and connecting a site, forms, fields, repeaters, entries, views, styles, form actions (email/confirmation/webhook), applications, coupons/discount codes, payments/subscriptions (Stripe/Square/PayPal), WPML translations, form landing pages, PDF downloads, templates, and troubleshooting known MCP bugs
+description: Create, query, and manage Formidable Forms via MCP — setup, forms, fields, repeaters, entries, views, styles, actions, workflows and approvals, applications, coupons, payments/subscriptions, membership levels and member/group/gift records, booking resources/staff, locations, services, schedules, availability, bookings and waitlists, WPML translations, landing pages, PDFs, templates, and MCP troubleshooting
 ---
 
 ## Overview
@@ -31,8 +31,11 @@ Read the reference file(s) for the task at hand BEFORE making MCP calls. Do not 
 | Gated content — restrict private pages/posts/files/PDFs/Views behind a form submission, access tokens/links | `references/actions.md` (action + tokens) and `references/shortcodes.md` §5 (`[frm_gated_content]`) |
 | Writing shortcodes — email/confirmation bodies, View content, form HTML, field defaults, conditionals, stats/graphs | `references/shortcodes.md` |
 | Applications (Pro) | `references/applications.md` |
+| **Workflows** — create/edit graphs, approvals, routing, templates, activation problems, inspect runs | `references/workflows.md` — read before creating workflow definitions. Requires the Workflows add-on with its abilities integration. |
 | **Coupons / discount codes** — creating codes, percentage vs flat discounts, assigning a coupon to a form, usage limits, coupon status | `references/coupons.md` — **read before any `create-coupon`**, three required fields alone produce a coupon that never applies |
 | **Payments** — payment/payment-gateway fields, Stripe/Square/PayPal/Authorize.net gateway actions, listing/refunding payments or cancelling subscriptions | `references/payments.md` — **never submit a test payment against a connected merchant account; verify by reading the action back, not by charging a card** |
+| **Memberships** — create/edit levels, roles, approval requirements, terms, group seats; inspect memberships, groups, gifts and invitations | `references/memberships.md` — level CRUD plus read-only operational records; creating a level does not enroll a member or configure a payment action |
+| **Bookings** — resources/staff, locations, services, weekly hours, service assignments, time-off, availability, booking records and waitlists | `references/bookings.md` — schedules and assignments replace the full set; booking/waitlist records are read-only; availability does not reserve a slot |
 | **Translations** — WPML-backed form/field string translations (requires the WPML compatibility add-on + WPML active) | `references/translations.md` — `string_id` (source string) and `translation_id` (one language's translation) are different IDs, don't mix them up |
 | **Form landing pages** — giving a form its own page, editing content/design, enabling or removing one | `references/landing-pages.md` |
 | PDF downloads — `[frm-pdf]` links in views/pages/emails, entry/View PDFs, email PDF attachments, Dompdf rendering constraints | `references/pdfs.md` |
