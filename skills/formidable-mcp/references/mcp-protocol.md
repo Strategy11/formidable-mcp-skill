@@ -308,6 +308,49 @@ All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` 
 | `update-form` | Update name, description, status, options, or `parent_form_id` | not idempotent |
 | `delete-form` | Delete a form — **cascades: the form's entries are deleted with it** (verified) | destructive |
 
+### Workflows (Workflows add-on)
+
+See [workflows.md](workflows.md) for input formats, activation checks, and a complete approval/revision example. IDs in this domain are positive integers.
+
+| Ability | Description | Notes |
+|---|---|---|
+| `get-workflow-schema` / `list-workflow-templates` | Discover installed steps, settings, and starter graphs | readonly |
+| `list-workflows` / `get-workflow` | Read definitions, problems, and writable builder rows | readonly; requires `frm_edit_forms` |
+| `create-workflow` / `update-workflow` | Create inactive by default or partially update a definition | builder rows in `steps`; activation can be refused |
+| `delete-workflow` | Delete a definition and cancel its active runs | destructive |
+| `list-workflow-runs` / `get-workflow-run` | Inspect run summaries without internal context or task tokens | readonly; requires `frm_view_entries` |
+
+### Memberships (Memberships add-on)
+
+See [memberships.md](memberships.md) for all inputs, level settings, role warnings and lifecycle boundaries. Requires active Pro, the add-on's abilities integration, shared MCP enabled, and a license not expired outside its grace period. IDs are numeric integers; collections page until an empty array (default 20, maximum 200).
+
+| Abilities | Purpose and permissions |
+|---|---|
+| `list-membership-levels`, `get-membership-level`, `create-membership-level`, `update-membership-level`, `delete-membership-level` | Level configuration CRUD; `frm_change_settings`; deletion refuses referenced levels |
+| `list-memberships`, `get-membership` | Membership lifecycle/payment reads; `frm_view_entries` |
+| `list-membership-groups`, `get-membership-group` | Group owner/level/seat reads; `frm_view_entries` |
+| `list-membership-gifts`, `get-membership-gift` | Gift/invitation reads; `frm_view_entries`; redemption codes excluded |
+
+Only levels have write abilities. Enrollment, membership transitions, group changes and gift/invitation operations use their normal product workflows. Level `price` is a display amount in major currency units; payment actions determine actual charges.
+
+### Bookings (Bookings add-on)
+
+See [bookings.md](bookings.md) for all inputs, settings, replacement semantics, timezone rules and staff scope. Requires active Pro, the add-on's abilities integration, shared MCP enabled, and a license not expired outside its grace period. IDs are numeric integers; collections page until an empty array (default 20, maximum 200).
+
+| Abilities | Purpose and boundaries |
+|---|---|
+| `list-booking-resources`, `get-booking-resource`, `create-booking-resource`, `update-booking-resource`, `delete-booking-resource` | Resource/staff CRUD; `settings` replaces the override map; resources with any booking history cannot be deleted |
+| `list-booking-locations`, `get-booking-location`, `create-booking-location`, `update-booking-location`, `delete-booking-location` | Location CRUD |
+| `list-booking-services`, `get-booking-service`, `create-booking-service`, `update-booking-service`, `delete-booking-service` | Service CRUD; `rate_minor` is integer hundredths |
+| `get-booking-resource-hours`, `set-booking-resource-hours` | Read/replace the whole weekly schedule; `[]` closes the resource |
+| `get-booking-resource-services`, `set-booking-resource-services` | Read/replace the complete service assignment set |
+| `list-booking-time-off`, `get-booking-time-off`, `create-booking-time-off`, `update-booking-time-off`, `delete-booking-time-off` | Manual block CRUD; resource ID required; externally synced blocks are read-only |
+| `get-booking-availability` | Picker-equivalent availability for a booking form and date; no reservation |
+| `list-bookings`, `get-booking` | Staff-scoped booking reads only |
+| `list-booking-waitlist`, `get-booking-waitlist-entry` | Staff-scoped waitlist reads only |
+
+Catalogue, schedule and availability calls use the admin resource-management permission; booking/waitlist reads use the existing booking-view permission and staff scope. Calendar feed URLs/internal calendar identifiers are excluded. New resources start with a full open week; set intended hours before activating staged resources. There are no booking/waitlist mutation abilities in this add-on integration.
+
 ### Entries
 | Ability | Description | Notes |
 |---|---|---|
