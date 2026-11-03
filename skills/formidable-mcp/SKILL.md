@@ -1,6 +1,6 @@
 ---
 name: formidable-mcp
-description: Create, query, and manage everything in Formidable Forms via MCP — first-time setup and connecting a site, forms, fields, repeaters, entries, views, styles, form actions (email/confirmation/webhook), applications, coupons/discount codes, payments/subscriptions (Stripe/Square/PayPal), WPML translations, form landing pages, PDF downloads, templates, and troubleshooting known MCP bugs
+description: Create, query, and manage everything in Formidable Forms via MCP — first-time setup and connecting a site, forms, fields, advanced conditional logic, repeaters, entries, views, styles, form actions (email/confirmation/webhook), applications, coupons/discount codes, payments/subscriptions (Stripe/Square/PayPal), WPML translations, form landing pages, PDF downloads, templates, and troubleshooting known MCP bugs
 ---
 
 ## Overview
@@ -22,6 +22,7 @@ Read the reference file(s) for the task at hand BEFORE making MCP calls. Do not 
 | **First-time setup / "how do I connect this?" / auth failures on the first call** | `references/getting-started.md` |
 | List/count forms, compare counts with the Forms screen, create/edit forms, add fields, field types & options, "Other" placeholders, form settings | `references/forms-and-fields.md` |
 | **7.0 advanced settings** — submission counts/time periods, GDPR consent/retention, linked image choices, composite-field logic, date/time ranges, autocomplete | `references/advanced-settings.md` plus the relevant task reference |
+| **Advanced conditional logic** — condition groups, "at least N", Site & User conditions, date/count measures, regex, Require/Read-only/Set value/validation effects, choice rules, Continue to, Next-button rules; checking or explaining a rule | `references/advanced-logic.md` — **use `update-field-logic`, not `update-field`**, for any of these (the core field write skips the add-on's save clean-up). Requires the Advanced Conditional Logic add-on |
 | Repeaters (repeatable sections) or nested/embedded forms | `references/repeaters.md` — **always**, this is the most error-prone area |
 | Entries (submissions), spam entries, views, field statistics | `references/entries-and-views.md` (spam: § "Spam entries") |
 | **Choosing a view type, styling a view, or laying one out** — tables, card grids, column counts, view Custom CSS | `references/entries-and-views.md` § "Styling views", § "Grid views" and § "Table views" — **read before writing any view content**, see rule 9 |
