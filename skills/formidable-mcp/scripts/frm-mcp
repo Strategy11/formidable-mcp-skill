@@ -112,15 +112,16 @@ init_session() {
 }
 
 call() {
-  local body
-  body=$(jq -n --arg a "$ability" --argjson p "$params" \
-    '{jsonrpc:"2.0",method:"tools/call",params:{name:"mcp-adapter-execute-ability",arguments:{ability_name:$a,parameters:$p}},id:2}')
+  # The body travels over stdin, never as an argument: Windows re-encodes
+  # non-ASCII command-line arguments before jq and curl see them.
   # Keep curl's stderr: a TLS or DNS failure returns no body, and silently
   # printing nothing reads like an empty result rather than a broken connection.
-  curl -sS ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
-    -H "Content-Type: application/json" \
-    -H "Mcp-Session-Id: $(cat "$SESSION_FILE" 2>/dev/null || true)" \
-    -u "$AUTH" -d "$body"
+  printf '%s' "$params" | jq -c --arg a "$ability" \
+    '{jsonrpc:"2.0",method:"tools/call",params:{name:"mcp-adapter-execute-ability",arguments:{ability_name:$a,parameters:.}},id:2}' |
+    curl -sS ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
+      -H "Content-Type: application/json" \
+      -H "Mcp-Session-Id: $(cat "$SESSION_FILE" 2>/dev/null || true)" \
+      -u "$AUTH" --data-binary @-
 }
 
 out=$(call)
