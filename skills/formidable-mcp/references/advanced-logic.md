@@ -15,7 +15,7 @@ Requires the Formidable Advanced Conditional Logic add-on, with MCP enabled and 
 | `validate-form-logic` | Rule checks for a whole form (`form_id` by ID or key), optionally limited to one `field_id` | readonly. Returns `errors`, `warnings`, `issues` |
 | `explain-field-logic` | Evaluate the main logic (`rule: "logic"`, the default) or an additional rule (`rule: 0, 1, …`) against sample `values` | readonly. Nothing is submitted |
 
-All four take a field by ID or key. Plain show/hide logic with one any/all group still works through `update-field` (see `forms-and-fields.md` § "Conditional Logic"). Use these abilities as soon as anything on this page is involved.
+The three field abilities accept a field ID or key. `validate-form-logic` takes a form ID or key and can narrow its checks to a field. Plain show/hide logic with one any/all group still works through `update-field` (see `forms-and-fields.md` § "Conditional Logic"). Use these abilities as soon as anything on this page is involved.
 
 What core already handles, so there's no add-on ability for it:
 
@@ -148,7 +148,7 @@ Submit button logic is stored in two places: Pro's base keys in the form's `opti
 
 `validate-form-logic` changes nothing. Each issue has `code`, `severity` (`error` = can't work as written, `warning` = likely mistake), `message`, `target` (`field` / `action` / `route`), `field_id` / `action_id` / `route`, `rule` (`"logic"` or the rule position), and `condition` / `group` when it is about one.
 
-Codes: `missing_source`, `invalid_regex`, `invalid_range`, `contradictory_conditions`, `at_least_too_high`, `unreachable_group`, `unreachable_rule`, `missing_choice`, `missing_destination`, `backward_destination`, `blocked_destination`, `invalid_route_destination`, `set_value_cycle`, `logic_cycle`. A `logic_cycle` (field A's logic reads B and B's reads A) is a warning, not a save blocker.
+Codes: `missing_source`, `virtual_source`, `invalid_regex`, `invalid_range`, `range_on_multiple`, `contradictory_conditions`, `at_least_too_high`, `unreachable_group`, `unreachable_rule`, `missing_choice`, `missing_destination`, `backward_destination`, `blocked_destination`, `invalid_route_destination`, `set_value_self_reference`, `set_value_cycle`, `logic_cycle`. A `logic_cycle` (field A's logic reads B and B's reads A) is a warning, not a save blocker.
 
 `explain-field-logic`:
 
