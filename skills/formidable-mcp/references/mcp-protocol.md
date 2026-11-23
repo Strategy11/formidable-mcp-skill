@@ -366,6 +366,17 @@ Requires Formidable Coupons **v1.1 or later**. If a coupon endpoint is unavailab
 | `update-coupon` | Update a coupon by ID or code; only keys sent are changed. `code`/`amount` are frozen once the coupon has been used | not idempotent |
 | `delete-coupon` | Delete a coupon by ID or code; submitted entries keep their code | destructive |
 
+### Advanced Conditional Logic (requires the Formidable Advanced Conditional Logic add-on)
+
+Requires the Advanced Conditional Logic add-on and an active license. See `advanced-logic.md` for the readable logic shape, effects and examples.
+
+| Ability | Description | Notes |
+|---|---|---|
+| `get-field-logic` | A field's main logic and additional rules in a readable shape, plus the effects that field can use | readonly, idempotent |
+| `update-field-logic` | Replace a field's main `logic`, its `rules`, or both, running the builder's save clean-up; returns the saved logic and that field's rule-check issues | idempotent; all or nothing |
+| `validate-form-logic` | Rule checks for a form's field logic, rules, action conditions and routing (`form_id` by ID or key, optional `field_id`) | readonly, idempotent |
+| `explain-field-logic` | Evaluate the main logic or one additional rule against sample `values`: per condition, per group, outcome, what PHP decides first | readonly, idempotent |
+
 ### Landing Pages (requires the Formidable Landing Pages add-on)
 
 Requires the Formidable Landing Pages add-on. If a landing-page endpoint is unavailable, check whether the add-on needs updating.

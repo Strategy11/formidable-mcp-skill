@@ -586,7 +586,7 @@ Fields compute values via the `calc` property in `field_options`.
 
 ## Conditional Logic
 
-For Name/Address subfield triggers such as `123_country`, read [advanced-settings.md](advanced-settings.md#composite-fields-and-conditional-logic).
+For Name/Address subfield triggers such as `123_country`, read [advanced-settings.md](advanced-settings.md#composite-fields-and-conditional-logic). For anything beyond plain show/hide with one any/all group (condition groups, Site & User conditions, Require/Read-only/Set value, choice rules, branches), use the Advanced Conditional Logic abilities in [advanced-logic.md](advanced-logic.md) instead of writing these keys directly.
 
 **Field-level** (show/hide fields based on other fields' values), in field_options:
 

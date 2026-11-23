@@ -133,6 +133,7 @@ skills/formidable-mcp/
 ├── references/
 │   ├── getting-started.md    # First-time setup: connecting a site, verifying, onboarding a teammate
 │   ├── forms-and-fields.md   # Forms, all field types, options, settings
+│   ├── advanced-logic.md     # Advanced conditional logic: groups, effects, rules, checks
 │   ├── repeaters.md          # Repeatable sections and nested forms (most error-prone area)
 │   ├── entries-and-views.md  # Submissions, views, filters, field statistics
 │   ├── shortcodes.md         # Shortcodes for emails, views, form HTML, conditionals, graphs
