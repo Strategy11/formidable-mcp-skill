@@ -293,7 +293,7 @@ Execute an ability.
 
 ## 7.0 capability placement
 
-Core MCP no longer requires the API add-on. Lite supplies forms, fields, entry list/get/delete, form actions, payment/subscription management, and style list/get/update. Pro supplies entry create/update, stats, applications, and style create/delete/assignment. Other abilities depend on the relevant add-ons. New settings often live in existing `options`/`field_options` objects rather than new abilities; see [advanced-settings.md](advanced-settings.md). There is no reviewed global-settings ability. The reviewed `update-form` executor updates name/description/status/options/parent_form_id, but not the top-level `logged_in`/`editable` properties accepted at creation.
+Core MCP no longer requires the API add-on. Lite supplies forms, fields, entry list/get/delete, form actions, payment/subscription management, and style list/get/update. Pro supplies entry create/update, stats, applications, and style create/delete/assignment. Other abilities depend on the relevant add-ons. New settings often live in existing `options`/`field_options` objects rather than new abilities; see [advanced-settings.md](advanced-settings.md). There is no reviewed global-settings ability. Lite 7.1+ accepts top-level `editable` on update. Set `logged_in` at creation.
 
 ## Abilities catalog
 
@@ -302,16 +302,18 @@ All ability IDs are namespaced `formidable-forms/<action>`. Most `id`/`form_id` 
 ### Forms
 | Ability | Description | Notes |
 |---|---|---|
+| `get-ai-status` | Check setup readiness and obtain the settings URL (Lite 7.1+) | readonly |
 | `list-forms` | List forms (id, form_key, name, description, status) — published and draft; trashed forms are excluded | readonly, idempotent |
 | `get-form` | Get one form by id/form_key; return format array or html | readonly |
 | `create-form` | Create a form with optional `fields[]` array; accepts `parent_form_id` for repeater child forms | not idempotent |
-| `update-form` | Update name, description, status, options, or `parent_form_id` | not idempotent |
+| `update-form` | Update name, description, status, top-level `editable` (7.1+), options, or `parent_form_id` | not idempotent |
 | `delete-form` | Delete a form — **cascades: the form's entries are deleted with it** (verified) | destructive |
 
 ### Entries
 | Ability | Description | Notes |
 |---|---|---|
 | `list-entries` | List submissions; supports form_id, paging, order, search, start_date/end_date | readonly |
+| `mark-entry-spam` | Move a submitted parent entry to spam by ID or key (Lite 7.1+) | idempotent |
 | `get-entry` | Get one entry by id/item_key. Also returns spam entries (`is_draft: 4`, meta HTML-escaped) | readonly |
 | `create-entry` | Submit an entry; requires form_id + values keyed by field id/field_key | |
 | `update-entry` | Update an entry's values (item_meta) | |
@@ -488,7 +490,7 @@ Two verified behaviors of inline `fields[]`:
 - `order_by`: sort field
 - `search`: search query
 - `start_date` / `end_date`: date range filtering
-- `is_draft`: 0 = submitted only, 1 = drafts only; **drafts are included when omitted**. Spam entries (status 4) are always left out, and no value lists them. See `entries-and-views.md` § "Spam entries"
+- `is_draft`: 0 = submitted only, 1 = drafts only; **drafts are included when omitted**. Lite 7.1+ accepts 4 for spam only. See `entries-and-views.md` § "Spam entries"
 
 ### The 200-per-page cap
 

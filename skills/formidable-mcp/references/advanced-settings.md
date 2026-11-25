@@ -4,6 +4,13 @@ Read this for submission quotas, GDPR/retention, linked image choices, composite
 
 These settings require Formidable 7.0 or later. Inspect the installed ability schema and read back saved settings; a successful write alone does not prove a feature is supported. Pro/add-on features require their implementing plugin to be active.
 
+## Field settings in 7.1
+
+- **Phone autocomplete (Lite)** — set `field_options.autocomplete` to `"tel"`.
+- **Choice buttons (Pro)** — set `field_options.image_options` to `"buttons"` for radio or checkbox fields. Pro provides this format independently of Surveys.
+- **Date typing (Pro)** — `field_options.allow_typing` controls manual input on standalone Flatpickr dates and defaults on. Ranges disable the option. The legacy jQuery picker hides it.
+- **File Upload conditions (Pro)** — in a field visibility condition, select the upload field by numeric ID and use `!=` for “has a file” or `==` for “has no file”. Leave the comparison value empty. Form-action conditions retain their own text comparison.
+
 ## Submission limits (Pro)
 
 Use `create-form` or `update-form` with an `options` object. These are identity-based quotas, distinct from closing an entire form after `max_entries` or limiting an individual choice's inventory.

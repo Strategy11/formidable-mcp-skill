@@ -366,30 +366,10 @@ Payment actions (`stripe`, `square`, `paypal`, `payment`) need live gateway cred
 
 ## Workflow: Create Form with Multiple Actions
 
-1. Create email action with form_id
-2. Create confirmation action with form_id
-3. Verify actions attached to form with list-form-actions (or get-form-action by the returned IDs)
-
-```bash
-FORM_ID=1429
-
-# Create email action
-EMAIL_ID=$(cat > /tmp/email.jsonl << 'JSON'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"$FORM_ID","type":"email","post_content":{"email_to":"[default-email]","email_message":"Test email","event":["create"]}}}}}
-JSON
-cat /tmp/email.jsonl | wp --path="/path/to/site" mcp-adapter serve --server=formidable-mcp --user=1 2>/dev/null | tail -1 | jq -r '.result.structuredContent.data.id')
-
-# Create confirmation action
-CONFIRM_ID=$(cat > /tmp/confirm.jsonl << 'JSON'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude","version":"1.0"}}}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/create-form-action","parameters":{"form_id":"$FORM_ID","type":"on_submit","post_content":{"success_action":"message","success_msg":"Thanks for submitting!","event":["create"]}}}}}
-JSON
-cat /tmp/confirm.jsonl | wp --path="/path/to/site" mcp-adapter serve --server=formidable-mcp --user=1 2>/dev/null | tail -1 | jq -r '.result.structuredContent.data.id')
-
-echo "Created email action: $EMAIL_ID"
-echo "Created confirmation action: $CONFIRM_ID"
-```
+1. Call `list-form-actions` with the form ID. Lite 7.1+ adds a default email notification to ordinary top-level forms.
+2. To customize the notification, read it with `get-form-action` and update it with `update-form-action`. Create another email action when the requested notification is missing or the user wants an additional notification.
+3. Find the intended confirmation (`on_submit`) in the list. Update it or create it if missing.
+4. Read the actions back and verify the recipients, triggers, and confirmation message.
 
 ## Event Triggers
 

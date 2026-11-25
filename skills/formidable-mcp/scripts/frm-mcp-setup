@@ -198,14 +198,24 @@ pass "authenticated as $WP_USERNAME (session opened)"
 
 # -------------------------------------------------------------- 5. abilities
 step "5. Formidable abilities"
-forms=$(curl -s --max-time 30 ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
+call_setup_ability() {
+  curl -s --max-time 30 ${TLS_OPTS[@]+"${TLS_OPTS[@]}"} -X POST "$URL" \
   -H 'Content-Type: application/json' -H "Mcp-Session-Id: $SESSION" \
   -u "$WP_USERNAME:$APPLICATION_PASSWORD" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/list-forms","parameters":{}}},"id":2}' 2>/dev/null)
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"formidable-forms/'"$1"'","parameters":{}}},"id":2}' 2>/dev/null
+}
+forms=$(call_setup_ability list-forms)
 
 count=$(printf '%s' "$forms" | jq -r '(.result.structuredContent.data // (.result.content[0].text | fromjson?).data // empty) | length' 2>/dev/null)
 if [ -z "$count" ]; then
   fail "list-forms did not return form data"
+  status=$(call_setup_ability get-ai-status)
+  printf '%s' "$status" | jq -r '
+    (.result.structuredContent // (.result.content[0].text | fromjson?)) |
+    (.data // .) | select(.ready == false) |
+    .blocked_reason, (if .enabled == false then
+      (if .can_enable then "Enable access at " else "Ask a settings administrator to enable access at " end) + .settings_url
+    else empty end)' 2>/dev/null
   printf '%s' "$forms" | jq '.' 2>/dev/null | head -20 || printf '%s\n' "$forms" | head -5
   next "see references/gotchas.md and references/mcp-protocol.md § Common errors and solutions."
   exit 1
