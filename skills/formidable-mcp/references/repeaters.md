@@ -2,6 +2,10 @@
 
 Read this when: creating, debugging, or verifying repeatable sections (repeaters) or nested forms in Formidable — the most error-prone area of form building via MCP.
 
+## Builder placement in 7.1
+
+Keep CAPTCHA, Submit, GDPR, Summary, Page Break, and embedded forms outside repeaters and sections. Keep repeaters outside sections. Apply these builder restrictions when planning MCP writes, including inline fields on a new form.
+
 ## 7.0 creation defaults and child forms
 
 Core abilities live in Lite/Pro. `create-field` seeds complete type defaults and merges partial `field_options`; copying 18/71+ default keys is no longer necessary. `update-field` merges with stored options. Both are shallow merges, so preserve complete nested maps when changing them.

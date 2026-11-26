@@ -17,6 +17,7 @@ Follow the local environment's canonical helper path when specified. For a conne
 **7.0 settings:** read [advanced-settings.md](advanced-settings.md) for submission quotas, GDPR/retention, linked image choices, subfield logic, ranges, and autocomplete.
 
 **Core abilities:**
+- Lite 7.1+ enables `options.antispam` by default and adds an email notification to ordinary top-level forms. Templates and child forms skip that notification. List actions before configuring email.
 - `formidable-forms/create-form` — parameters: `name`, `description`, `status`, `logged_in`, `is_template`, `editable`, `fields` (array), `parent_form_id` (integer; persists the child→parent link, e.g. for repeater child forms), and `options` (object). **`options` is applied as the form is created** — `submit_value`, `ajax_submit`, `success_msg`, `success_action` and the rest all take effect in the one call, and any option left out is created with its default. No follow-up `update-form` is needed just to set form options.
 - `formidable-forms/update-form` — parameters: `id` (required), plus `name`, `description`, `status` (published/draft), `options` (object), `parent_form_id` (integer; `0` to detach)
 - `formidable-forms/list-forms` — parameters include `page` and `page_size`; returns an object keyed by `form_key`, with summaries such as `{id, form_key, name, status}`. The default page size is 50, capped at 200.
@@ -671,7 +672,7 @@ Key form-level settings (in form `<options>`):
 - `custom_style` — Style key to apply to form
 - `single_entry`, `single_entry_type`, `single_entry_limit`, `single_entry_interval`, `single_entry_interval_count` — Pro submission quotas; see `advanced-settings.md` for required enable flag, identities, and calendar semantics
 - `chat` — ["1"] for conversational (chat) forms
-- `logged_in` and `editable` are top-level form properties at creation, not `options` keys. The reviewed `update-form` schema/executor does not expose updates to them; use the settings UI if needed rather than claiming an `options` write changes them.
+- On Lite 7.1+, pass `{"id":123,"editable":true}` to `update-form` to enable entry editing, or use `false` to disable it. Verify the top-level value with `get-form`. Set `logged_in` at creation or change it later in the settings UI.
 
 ## Layout & Composite Fields
 

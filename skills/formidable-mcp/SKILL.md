@@ -59,3 +59,5 @@ Read the reference file(s) for the task at hand BEFORE making MCP calls. Do not 
 ## Version-aware settings
 
 Core MCP abilities ship in Lite/Pro in 7.0; the API add-on is not required for them. If a documented endpoint is unavailable or an ability is missing, check whether Formidable or the add-on implementing it needs updating. Coupon abilities require Coupons v1.1 or later. Read `references/advanced-settings.md` for 7.0 settings and capability boundaries. New `field_options` merge with type defaults; updates merge with stored options, and nested arrays/maps are replaced as a whole. Use targeted payloads and verify saved values rather than copying unrelated settings from another form. Do not infer feature support merely because an options object was accepted.
+
+For Lite/Pro 7.1+, consult the task references for setup readiness, spam moderation, form creation defaults, entry editing, container placement, field options, and After Payment updates. Check available abilities on older sites.

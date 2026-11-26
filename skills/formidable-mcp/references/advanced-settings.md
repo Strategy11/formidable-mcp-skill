@@ -4,6 +4,13 @@ Read this for submission quotas, GDPR/retention, linked image choices, composite
 
 These settings require Formidable 7.0 or later. Inspect the installed ability schema and read back saved settings; a successful write alone does not prove a feature is supported. Pro/add-on features require their implementing plugin to be active.
 
+## Field settings in 7.1
+
+- **Phone autocomplete (Lite)** — set `field_options.autocomplete` to `"tel"`.
+- **Choice buttons (Pro)** — set `field_options.image_options` to `"buttons"` for radio or checkbox fields. Pro provides this format independently of Surveys.
+- **Date typing (Pro)** — `field_options.allow_typing` controls manual input on standalone Flatpickr dates and defaults on. Ranges disable the option. The legacy jQuery picker hides it.
+- **File Upload conditions (Pro)** — in a field visibility condition, select the upload field by numeric ID and use `!=` for “has a file” or `==` for “has no file”. Leave the comparison value empty. Form-action conditions retain their own text comparison.
+
 ## Submission limits (Pro)
 
 Use `create-form` or `update-form` with an `options` object. These are identity-based quotas, distinct from closing an entire form after `max_entries` or limiting an individual choice's inventory.
@@ -76,7 +83,7 @@ Use this only when the user's task authorizes permanent retention-based deletion
 
 Global `enable_gdpr`, `no_gdpr_cookies`, `no_ips`, and custom IP-header settings are not per-form overrides. No global-settings ability is present in the reviewed core catalog. If a prerequisite needs changing, explain the required Global Settings UI action instead of inventing an MCP setting or writing to the database.
 
-**Spam retention is separate:** Pro's global `spam_retention_days` defaults to 30 and supports `0` (keep until manually deleted), `7`, `15`, `30`, `60`, or `90`. This cleanup does not require global GDPR. It is not `auto_delete_days`. See [entries-and-views.md](entries-and-views.md#spam-entries-is_draft-4) for MCP access limitations.
+**Spam retention is separate:** Pro's global `spam_retention_days` defaults to 30 and supports `0` (keep until manually deleted), `7`, `15`, `30`, `60`, or `90`. This cleanup does not require global GDPR. It is not `auto_delete_days`. See [entries-and-views.md](entries-and-views.md#spam-entries-is_draft-4) for how to list and mark spam.
 
 ## Images in dynamic and lookup choices (Pro)
 
@@ -149,6 +156,6 @@ For a `range` slider, `mingap: 0` is valid and allows handles to meet. A blank/n
 
 The Lite/Pro core ability catalog was compared with [mcp-protocol.md](mcp-protocol.md). 7.0 moves core abilities into Lite/Pro: basic forms/fields/reads/actions/payments are in Lite; entry create/update, statistics, application management and additional style management are Pro. Add-ons supply their own abilities. Do not require `formidable-api` merely to use core MCP features or debug the retired `FrmAPIAbilitiesController` for a core schema problem.
 
-The `v6.35..HEAD` review also covered application assignment from the Forms list (use existing application abilities), style CSS-class renaming (UI feature; do not assume `update-style` supports slug changes), readonly checkbox validation, checkbox statistics/view comparisons, numeric/currency formatting, repeater rendering/button labels, CSV draft statuses, conditional payment actions, spam handling, meta indexing, import remapping, and builder/frontend accessibility/performance fixes. These reuse existing abilities/settings; they do not warrant invented new tool names. Import/export, application, style, shortcode and payment tasks still use their dedicated references.
+The `v6.35..HEAD` review also covered application assignment from the Forms list (use existing application abilities), style CSS-class renaming (UI feature; do not assume `update-style` supports slug changes), readonly checkbox validation, checkbox statistics/view comparisons, numeric/currency formatting, repeater rendering/button labels, CSV draft statuses, conditional payment actions, meta indexing, import remapping, and builder/frontend accessibility/performance fixes. These 7.0 items reuse existing abilities/settings; they do not warrant invented new tool names. Lite 7.1 does add new tools: `mark-entry-spam` for spam (see [entries-and-views.md](entries-and-views.md#spam-entries-is_draft-4)) and `get-ai-status` for setup checks. Import/export, application, style, shortcode and payment tasks still use their dedicated references.
 
 Primary code locations for updating this reference: `FrmProFormEntryLimitHelper`, `FrmProAutoDeleteEntriesController`, `FrmProSpamEntriesController`, `FrmProChoiceImagesHelper`, `FrmProOtherInputHelper`, `FrmProConditionalLogicController`, `FrmProRangeFieldsController`, `FrmProTransLiteController`, `FrmAbilitiesFormsController`, and `FrmAbilitiesFieldsController`. Check tests for those classes when semantics are unclear.

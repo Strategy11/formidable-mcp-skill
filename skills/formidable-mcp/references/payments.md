@@ -4,6 +4,10 @@ Read this when: adding a payment field to a form, creating/configuring a payment
 
 **Never submit a test payment against a connected merchant account.** Payment actions (`stripe`, `square`, `paypal`, `payment`) charge a real gateway. Verify configuration by reading the action back (`get-form-action`) and inspecting the rendered field in a browser — don't complete a checkout to confirm it works.
 
+## After Payment updates (Pro 7.1+)
+
+With Pro active, Lite Stripe, Square, and PayPal payment actions can update an entry field when the payment status changes. Read the action and preserve existing `post_content.change_field` rows. Each row has a numeric destination field `id`, a trigger `status` (`complete`, `failed`, `refunded`, `future-cancel`, or `canceled`), and a replacement `value`. When the payments add-on is active it handles its own gateways. Pro still handles Lite Square and PayPal updates. Read the saved rows back without submitting a payment.
+
 ## Three separate layers
 
 Payments in Formidable span three things that are easy to conflate:

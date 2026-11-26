@@ -4,6 +4,10 @@ Read this when: the site has never been connected from this machine, someone ask
 
 **Rule that outranks everything below: never ask for credentials.** Not in chat, not as a command to run, not "paste it and I'll put it in the file for you". The credential travels as a file: downloaded from Formidable's settings screen (or, on older versions, typed into `frm-mcp.env` by the user), and an assistant may move that file into place but never opens it. An assistant's job here is to say which command to run and to read the output — see § "Onboarding someone else" for wording that works.
 
+## When authentication succeeds but forms are unavailable
+
+On Lite 7.1+, call `get-ai-status` with an empty object through a connected adapter. Check `ready` and `blocked_reason`. If access is disabled, open the returned `settings_url` when `can_enable` is true, or ask a settings administrator to enable it. Rediscover abilities and retry `list-forms`. Older installations and users without form-view permission may lack status discovery.
+
 ## Which path applies
 
 | Situation | Path | Needs a password? |
